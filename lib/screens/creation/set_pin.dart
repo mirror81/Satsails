@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:Satsails/translations/translations.dart';
+import 'package:Satsails/translations/localizations.dart';
 import 'package:Satsails/screens/shared/custom_button.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
@@ -47,15 +47,6 @@ class _SetPinState extends ConsumerState<SetPin> {
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 16.h),
-                Text(
-                  'This PIN will be used to unlock your wallet'.i18n,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16.sp,
-                  ),
-                ),
                 SizedBox(height: 50.h), // Replaced Spacer
                 PinProgressIndicator(currentLength: pin.length),
                 SizedBox(height: 50.h), // Replaced Spacer(flex: 2)
@@ -85,8 +76,9 @@ class _SetPinState extends ConsumerState<SetPin> {
                       context.push('/confirm_pin');
                     }
                         : () {},
-                    primaryColor: Colors.green,
-                    secondaryColor: Colors.green,
+                    primaryColor: Colors.green.withOpacity(0.8),
+                    secondaryColor: Colors.green.withOpacity(0.6),
+                    textColor: Colors.black,
                   ),
                 ),
                 SizedBox(height: 40.h),

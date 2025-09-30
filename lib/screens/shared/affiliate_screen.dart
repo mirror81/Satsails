@@ -1,145 +1,157 @@
+import 'package:Satsails/models/user_model.dart';
 import 'package:Satsails/providers/user_provider.dart';
+import 'package:Satsails/screens/shared/custom_button.dart';
 import 'package:Satsails/screens/shared/message_display.dart';
+import 'package:Satsails/translations/localizations.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import 'package:Satsails/providers/auth_provider.dart';
-import 'package:Satsails/providers/send_tx_provider.dart';
-import 'package:Satsails/translations/translations.dart'; // Assuming translation support
 
-class AffiliateScreen extends ConsumerStatefulWidget {
+class AffiliateScreen extends ConsumerWidget {
   const AffiliateScreen({super.key});
 
   @override
-  _AffiliateScreenState createState() => _AffiliateScreenState();
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 20.h),
+          child: const _AffiliateView(),
+        ),
+      ),
+    );
+  }
 }
 
-class _AffiliateScreenState extends ConsumerState<AffiliateScreen> {
+class _AffiliateView extends ConsumerStatefulWidget {
+  const _AffiliateView();
+
   @override
-  void initState() {
-    super.initState();
-    // Refresh the user provider to ensure the latest state
-    ref.refresh(userProvider);
-    // Reset providers only once when the widget is initialized
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(sendTxProvider.notifier).resetToDefault();
-      ref.read(sendBlocksProvider.notifier).state = 1;
+  ConsumerState<_AffiliateView> createState() => _AffiliateViewState();
+}
+
+class _AffiliateViewState extends ConsumerState<_AffiliateView> {
+  final _textController = TextEditingController();
+  bool _isLoading = false;
+  String? _errorMessage;
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _handleContinue() async {
+    if (_isLoading) return;
+
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
     });
+
+    final enteredCode = _textController.text.trim();
+
+    try {
+      if (enteredCode.isNotEmpty) {
+        final upperCaseCode = enteredCode.toUpperCase();
+        await ref.read(userProvider.notifier).setAffiliateCode(upperCaseCode);
+
+        if (mounted) {
+          showMessageSnackBar(
+              message: 'Affiliate code inserted successfully'.i18n,
+              error: false,
+              context: context,
+              top: true);
+        }
+      }
+
+      ref.invalidate(initializeUserProvider);
+
+      if (mounted) {
+        context.go('/home');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _errorMessage = 'Failed to save affiliate code'.i18n;
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    // Read the affiliate code from userProvider
-    final currentInsertedAffiliateCode = ref.refresh(userProvider).affiliateCode ?? '';
-
-    return Scaffold(
-      backgroundColor: Colors.black, // Dark theme consistent with OpenPin
-      appBar: AppBar(
-        title: Center(
-          child: Text(
-            'Affiliate Code'.i18n, // Translated title
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.bold,
-              fontSize: 20.sp, // Responsive font size
+    return KeyboardDismissOnTap(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const Spacer(),
+          Text('Affiliate Program'.i18n,
+              style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 30.sp,
+                  fontWeight: FontWeight.bold)),
+          SizedBox(height: 12.h),
+          Text(
+              'Enter a code if you were referred by someone. You can add this later in settings.'
+                  .i18n,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  color: Colors.white.withOpacity(0.7),
+                  fontSize: 18.sp,
+                  height: 1.5)),
+          SizedBox(height: 24.h),
+          TextField(
+            controller: _textController,
+            textAlign: TextAlign.center,
+            style: const TextStyle(color: Colors.white),
+            decoration: InputDecoration(
+              hintText: 'Affiliate Code'.i18n,
+              filled: true,
+              fillColor: Colors.black.withOpacity(0.2),
+              hintStyle: TextStyle(color: Colors.grey[400]),
+              labelStyle: TextStyle(color: Colors.grey[400]),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+                borderSide: BorderSide(color: Colors.white.withOpacity(0.2)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12.r),
+                borderSide: const BorderSide(color: Colors.orange),
+              ),
             ),
           ),
-        ),
-        backgroundColor: Colors.black,
-        automaticallyImplyLeading: false,
-      ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // Success or info icon based on affiliate code status
-            currentInsertedAffiliateCode.isNotEmpty
-                ? Icon(
-              Icons.check_circle,
-              color: Colors.green,
-              size: 48.w, // Responsive size
-            )
-                : Icon(
-              Icons.info,
-              color: Colors.orange,
-              size: 48.w, // Responsive size
-            ),
-            SizedBox(height: 20.h), // Responsive spacing
-            // Styled container for the affiliate code message
-            Container(
-              padding: EdgeInsets.all(24.w), // Larger padding for prominence
-              decoration: BoxDecoration(
-                color: const Color(0x00333333).withOpacity(0.4), // Dark grey background
-                borderRadius: BorderRadius.circular(15), // Rounded corners
-              ),
-              constraints: BoxConstraints(maxWidth: 350.w), // Slightly larger card
+          if (_errorMessage != null)
+            Padding(
+              padding: EdgeInsets.only(top: 12.h),
               child: Text(
-                currentInsertedAffiliateCode.isEmpty
-                    ? 'No affiliate code inserted.'.i18n
-                    : 'Affiliate code "$currentInsertedAffiliateCode" inserted successfully!'.i18n,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18.sp, // Responsive text size
-                  fontWeight: FontWeight.bold,
-                ),
+                _errorMessage!,
                 textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.redAccent, fontSize: 14.sp),
               ),
             ),
-            SizedBox(height: 40.h), // Responsive spacing
-            // Continue button styled like OpenPin's "Unlock" button
-            ElevatedButton(
-              onPressed: () async {
-                final authModel = ref.read(authModelProvider);
-                final user = ref.read(userProvider);
-                final insertedAffiliateCode = user.affiliateCode ?? '';
-                final hasUploadedAffiliateCode = user.hasUploadedAffiliateCode ?? false;
-
-                final mnemonic = await authModel.getMnemonic();
-                if (mnemonic != null && mnemonic.isNotEmpty) {
-                  if (insertedAffiliateCode.isNotEmpty && !hasUploadedAffiliateCode) {
-                    try {
-                      await ref.read(addAffiliateCodeProvider(insertedAffiliateCode).future);
-                      showMessageSnackBar(
-                        message: 'Affiliate code inserted successfully'.i18n,
-                        error: false,
-                        context: context,
-                        top: true,
-                      );
-                      ref.invalidate(initializeUserProvider);
-                    } catch (e) {
-                      // Display error message if the provider throws an error
-                      showMessageSnackBar(
-                        message: 'Error inserting affiliate code'.i18n,
-                        error: true,
-                        context: context,
-                        top: true,
-                      );
-                    }
-                  }
-                  context.pushReplacement('/open_pin');
-                } else {
-                  context.pushReplacement('/start');
-                }
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                padding: EdgeInsets.symmetric(horizontal: 40.w, vertical: 15.h),
-              ),
-              child: Text(
-                'Continue'.i18n,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 16.sp,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        ),
+          const Spacer(),
+          SizedBox(height: 20.h),
+          _isLoading
+              ? const Center(
+              child: CircularProgressIndicator(color: Colors.white))
+              : CustomButton(
+            text: 'Continue'.i18n,
+            onPressed: _handleContinue,
+            primaryColor: Colors.green.withOpacity(0.8),
+            secondaryColor: Colors.green.withOpacity(0.6),
+            textColor: Colors.black,
+          ),
+        ],
       ),
     );
   }

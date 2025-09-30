@@ -1,141 +1,189 @@
+import 'dart:async';
 import 'package:Satsails/helpers/asset_mapper.dart';
 import 'package:Satsails/helpers/bitcoin_formart_converter.dart';
 import 'package:Satsails/helpers/common_operation_methods.dart';
 import 'package:Satsails/helpers/string_extension.dart';
 import 'package:Satsails/models/transactions_model.dart';
 import 'package:Satsails/providers/background_sync_provider.dart';
-import 'package:Satsails/providers/currency_conversions_provider.dart';
 import 'package:Satsails/providers/eulen_transfer_provider.dart';
 import 'package:Satsails/providers/navigation_provider.dart';
 import 'package:Satsails/providers/nox_transfer_provider.dart';
 import 'package:Satsails/providers/sideswap_provider.dart';
 import 'package:Satsails/providers/transactions_provider.dart';
-import 'package:Satsails/screens/shared/backup_warning.dart';
-import 'package:Satsails/screens/shared/boltz_transactions_details_screen.dart';
-import 'package:boltz/boltz.dart' as boltz;
+import 'package:Satsails/screens/shared/lightning_conversion_transaction_details.dart';
+import 'package:Satsails/screens/shared/sideshift_transaction_details_screen.dart'
+as sideshift;
 import 'package:flutter/material.dart';
+import 'package:flutter_breez_liquid/flutter_breez_liquid.dart' as breez;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import 'package:Satsails/translations/translations.dart';
+import 'package:Satsails/translations/localizations.dart';
 import 'package:i18n_extension/i18n_extension.dart';
+import 'package:in_app_review/in_app_review.dart';
 import 'package:intl/intl.dart';
 import 'package:Satsails/providers/settings_provider.dart';
 import 'package:pull_to_refresh_flutter3/pull_to_refresh_flutter3.dart';
 
-Widget buildNoTransactionsFound(double screenHeight) {
-  return Column(
-    mainAxisSize: MainAxisSize.min,
-    children: [
-      Text(
-        'No transactions found'.i18n,
-        style: TextStyle(
-          fontSize: 16.sp,
-          color: Colors.grey,
+// --- (buildHiddenTransactionsView and buildNoTransactionsFound widgets are unchanged) ---
+Widget buildHiddenTransactionsView(BuildContext context, WidgetRef ref) {
+  return GestureDetector(
+    onTap: () {
+      final currentVisibility = ref.read(settingsProvider).balanceVisible;
+      ref.read(settingsProvider.notifier).setBalanceVisible(!currentVisibility);
+    },
+    child: Container(
+      color: Colors.transparent,
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.visibility_off_outlined,
+              size: 50.sp,
+              color: Colors.white.withOpacity(0.6),
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              'Transactions Hidden'.i18n,
+              style: TextStyle(
+                fontSize: 18.sp,
+                fontWeight: FontWeight.w600,
+                color: Colors.white.withOpacity(0.8),
+              ),
+            ),
+            SizedBox(height: 4.h),
+            Text(
+              'Tap to show'.i18n,
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: Colors.white54,
+              ),
+            ),
+          ],
         ),
       ),
-    ],
+    ),
   );
 }
 
+Widget buildNoTransactionsFound(double screenHeight) {
+  return Center(
+    child: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 32.w),
+      child: Container(
+        padding: EdgeInsets.symmetric(vertical: 32.h, horizontal: 24.w),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.satellite_alt_outlined,
+              size: 60.sp,
+              color: Colors.white.withOpacity(0.7),
+            ),
+            SizedBox(height: 16.h),
+            Text(
+              'No transactions found'.i18n,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 20.sp,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.white.withOpacity(0.8)),
+            ),
+            SizedBox(height: 8.h),
+            Text(
+              'Your recent transactions will appear here.'.i18n,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 14.sp,
+                color: Colors.white54,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ),
+  );
+}
+
+
 class TransactionListByWeek extends ConsumerWidget {
-  final List<BaseTransaction> transactions; // Required parameter
+  final List<BaseTransaction> transactions;
 
   const TransactionListByWeek({
     super.key,
-    required this.transactions, // Marked as required
+    required this.transactions,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // Group transactions by month
     final Map<DateTime, List<BaseTransaction>> groupedTransactions = {};
     for (var tx in transactions) {
-      // Normalize to the first day of the month for grouping
       final monthKey = DateTime(tx.timestamp.year, tx.timestamp.month, 1);
       groupedTransactions.putIfAbsent(monthKey, () => []).add(tx);
     }
 
-    // Convert to a sorted list of months (descending order: most recent first)
     final sortedMonths = groupedTransactions.keys.toList()
       ..sort((a, b) => b.compareTo(a));
 
-    // Check if there are no transactions
     if (sortedMonths.isEmpty) {
       return Center(
         child: buildNoTransactionsFound(MediaQuery.of(context).size.height),
       );
     }
 
-    // If there are transactions, build the list
     return ListView.builder(
       physics: const AlwaysScrollableScrollPhysics(),
       itemCount: sortedMonths.length,
       itemBuilder: (context, index) {
         final month = sortedMonths[index];
         final transactionsInMonth = groupedTransactions[month]!;
-        return _buildMonthCard(context, ref, month, transactionsInMonth);
+        return _buildMonthGroup(context, ref, month, transactionsInMonth, index);
       },
     );
   }
 }
 
-Widget _buildMonthCard(
-    BuildContext context,
-    WidgetRef ref,
-    DateTime month,
-    List<BaseTransaction> transactions) {
+Widget _buildMonthGroup(BuildContext context, WidgetRef ref, DateTime month,
+    List<BaseTransaction> transactions, int index) {
   String locale = I18n.locale.languageCode ?? 'en';
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       Padding(
-        padding: EdgeInsets.symmetric(horizontal: 16.w),
+        padding: EdgeInsets.fromLTRB(16.w, index == 0 ? 0 : 24.h, 16.w, 8.h),
         child: Text(
           DateFormat('MMMM yyyy', locale).format(month),
-          style: const TextStyle(
-            fontSize: 18,
+          style: TextStyle(
+            fontSize: 18.sp,
             fontWeight: FontWeight.bold,
             color: Colors.white,
           ),
         ),
       ),
-      Card(
-        color: const Color(0x00333333).withOpacity(0.4),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(15),
+      Container(
+        margin: EdgeInsets.symmetric(horizontal: 16.w),
+        decoration: BoxDecoration(
+          color: const Color(0xFF333333).withOpacity(0.4),
+          borderRadius: BorderRadius.circular(15.r),
         ),
-        margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const SizedBox(height: 8),
-            // List of transactions for this month
-            ListView.builder(
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              itemCount: transactions.length,
-              itemBuilder: (context, txIndex) {
-                final tx = transactions[txIndex];
-                return _buildUnifiedTransactionItem(tx, context, ref);
-              },
-            ),
-          ],
+        child: ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: transactions.length,
+          itemBuilder: (context, txIndex) {
+            final tx = transactions[txIndex];
+            return _buildUnifiedTransactionItem(tx, context, ref);
+          },
         ),
       ),
     ],
   );
 }
 
-
 class TransactionList extends ConsumerStatefulWidget {
-  final bool showAll;
-  final List<BaseTransaction>? transactions;
-
   const TransactionList({
     super.key,
-    required this.showAll,
-    this.transactions,
   });
 
   @override
@@ -143,1023 +191,583 @@ class TransactionList extends ConsumerStatefulWidget {
 }
 
 class _TransactionListState extends ConsumerState<TransactionList> {
-  // Initialize the RefreshController
-  final RefreshController _refreshController = RefreshController(initialRefresh: false);
+  final RefreshController _refreshController =
+  RefreshController(initialRefresh: false);
 
-  // Define the refresh action
   Future<void> _onRefresh() async {
     await ref.read(backgroundSyncNotifierProvider.notifier).performFullUpdate();
     _refreshController.refreshCompleted();
   }
 
   @override
-  Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final transactionState = ref.watch(transactionNotifierProvider);
-    final allTransactions = widget.transactions ?? transactionState.value?.allTransactionsSorted ?? [];
-
-    final filteredTransactions = widget.showAll
-        ? allTransactions
-        : allTransactions
-        .where((tx) =>
-    !(tx is SideShiftTransaction && (tx.details.status == 'waiting' || tx.details.status == 'expired')) &&
-        !(tx is BoltzTransaction && !(tx.details.completed ?? false)) &&
-        !(tx is EulenTransaction &&
-            (tx.details.failed ||
-                tx.details.status == 'expired' ||
-                tx.details.status == 'pending')) &&
-        !(tx is NoxTransaction &&
-            (tx.details.status == 'quote' ||
-                tx.details.status == 'failed')))
-        .take(4)
-        .toList();
-
-    final buyButton = GestureDetector(
-      onTap: () {
-        ref.read(navigationProvider.notifier).state = 3;
-      },
-      child: Padding(
-        padding: EdgeInsets.only(right: 8.sp),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12.r),
-          ),
-          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 9.h),
-          child: Text(
-            'Buy'.i18n,
-            style: TextStyle(
-              color: Colors.black,
-              fontSize: 17.sp,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ),
-    );
-
-    final isBalanceVisible = ref.watch(settingsProvider).balanceVisible;
-
-    return Column(
-      children: [
-        if (!widget.showAll)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: BackupWarning(),
-              ),
-              buyButton,
-            ],
-          ),
-        if (!widget.showAll) const SizedBox(height: 8),
-        Expanded(
-          child: Card(
-            color: const Color(0x00333333).withOpacity(0.4),
-            shape: const RoundedRectangleBorder(
-              borderRadius: BorderRadius.all(Radius.circular(15)),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (!isBalanceVisible)
-                  Expanded(
-                    child: Center(
-                      child: Text(
-                        'Transactions hidden'.i18n,
-                        style: TextStyle(
-                          fontSize: 16.sp,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ),
-                  )
-                else
-                  filteredTransactions.isEmpty
-                      ? Expanded(
-                    child: Center(
-                      child: buildNoTransactionsFound(screenHeight),
-                    ),
-                  )
-                      : Expanded(
-                    child: SmartRefresher(
-                      enablePullDown: true,
-                      enablePullUp: false,
-                      header: ClassicHeader(
-                          refreshingText: 'Refreshing'.i18n,
-                          releaseText: 'Release'.i18n,
-                          idleText: 'Pull down to refresh'.i18n
-                      ),
-                      controller: _refreshController,
-                      onRefresh: _onRefresh,
-                      child: ListView.builder(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        itemCount: filteredTransactions.length,
-                        itemBuilder: (context, index) => _buildUnifiedTransactionItem(
-                          filteredTransactions[index],
-                          context,
-                          ref,
-                        ),
-                      ),
-                    ),
-                  ),
-                if (!widget.showAll && isBalanceVisible)
-                  TextButton(
-                    onPressed: () {
-                      context.pushNamed('transactions');
-                    },
-                    child: Text(
-                      'See all transactions'.i18n,
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  @override
   void dispose() {
-    _refreshController.dispose(); // Clean up the controller
+    _refreshController.dispose();
     super.dispose();
   }
-}
 
-Widget _buildUnifiedTransactionItem(dynamic transaction, BuildContext context, WidgetRef ref) {
-  Widget transactionItem;
-  if (transaction is SideswapPegTransaction) {
-    transactionItem = _buildSideswapPegTransactionItem(transaction, context, ref);
-  } else if (transaction is BitcoinTransaction) {
-    transactionItem = _buildBitcoinTransactionItem(transaction, context, ref);
-  } else if (transaction is LiquidTransaction) {
-    transactionItem = _buildLiquidTransactionItem(transaction, context, ref);
-  } else if (transaction is EulenTransaction) {
-    transactionItem = _buildEulenTransactionItem(transaction, context, ref);
-  } else if (transaction is NoxTransaction) {
-    transactionItem = _buildNoxTransactionItem(transaction, context, ref);
-  } else if (transaction is BoltzTransaction) {
-    transactionItem = _buildBoltzTransactionItem(transaction, context, ref);
-  } else if (transaction is SideShiftTransaction) {
-    transactionItem = _buildSideshiftTransactionItem(transaction, context, ref);
-  } else {
-    transactionItem = const SizedBox.shrink();
-  }
-  return transactionItem;
-}
+  /// Checks for transactions and prompts for a review if necessary.
+  Future<void> _checkForReviewPrompt(Transaction transactionState) async {
+    final settings = ref.read(settingsProvider);
+    if (settings.reviewDone) return;
 
-Widget _buildBoltzTransactionItem(
-    BoltzTransaction transaction,
-    BuildContext context,
-    WidgetRef ref,
-    ) {
-  final isCompleted = transaction.details.completed ?? false;
-  final statusText = isCompleted ? "Completed".i18n : "Pending".i18n;
-  final isPending = !isCompleted;
+    final hasRelevantTransactions =
+        transactionState.bitcoinTransactions.isNotEmpty ||
+            transactionState.liquidTransactions.isNotEmpty;
 
-  final btcFormat = ref.read(settingsProvider).btcFormat;
+    if (hasRelevantTransactions) {
+      await Future.delayed(const Duration(seconds: 5));
 
-  final isReceiving = transaction.details.swap.kind == boltz.SwapType.reverse;
-  final title = isReceiving ? "Lightning ${"to".i18n} L-BTC" : "L-BTC ${"to".i18n} Lightning";
-
-  final amountBtc = isCompleted
-      ? btcInDenominationFormatted(transaction.details.swap.outAmount, btcFormat)
-      : null;
-  final amountText = amountBtc;
-
-  // Calculate fiat value using boltzTransactionAmountInFiat (only if completed)
-  String? fiatValue;
-  if (isCompleted) {
-    try {
-      fiatValue = boltzTransactionAmountInFiat(transaction.details, ref);
-    } catch (e) {
-      fiatValue = null; // Omit if function fails
+      final inAppReview = InAppReview.instance;
+      if (await inAppReview.isAvailable()) {
+        inAppReview.requestReview();
+        ref.read(settingsProvider.notifier).setReviewDone(true);
+      }
     }
   }
 
-  // Format date based on locale
-  String locale = I18n.locale.languageCode;
-  final formattedDate = DateFormat('d, MMMM, HH:mm', locale).format(
-    DateTime.fromMillisecondsSinceEpoch(transaction.details.timestamp),
-  );
+  @override
+  Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isBalanceVisible = ref.watch(settingsProvider).balanceVisible;
+    final transactionState = ref.watch(transactionNotifierProvider);
 
-  // Build the widget
-  return GestureDetector(
-    onTap: () {
-      ref.read(selectedBoltzTransactionProvider.notifier).state = transaction;
-      context.pushNamed('boltzTransactionDetails');
-    },
-    behavior: HitTestBehavior.opaque,
-    child: Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+    ref.listen<Transaction>(transactionNotifierProvider, (previous, next) {
+      _checkForReviewPrompt(next);
+    });
+
+    final settledTransactions =
+    transactionState.settledTransactions.take(6).toList();
+    final allTransactions = transactionState.allTransactionsSorted;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF333333).withOpacity(0.4),
+        borderRadius: BorderRadius.circular(16.r),
+      ),
+      child: Column(
         children: [
-          // Icon with optional progress indicator
+          Expanded(
+            child: !isBalanceVisible
+                ? buildHiddenTransactionsView(context, ref)
+                : settledTransactions.isEmpty
+                ? buildNoTransactionsFound(screenHeight)
+                : SmartRefresher(
+              enablePullDown: true,
+              header: ClassicHeader(
+                  refreshingText: 'Refreshing'.i18n,
+                  releaseText: 'Release'.i18n,
+                  idleText: 'Pull down to refresh'.i18n),
+              controller: _refreshController,
+              onRefresh: _onRefresh,
+              child: ListView.builder(
+                padding: EdgeInsets.zero,
+                physics: const AlwaysScrollableScrollPhysics(),
+                itemCount: settledTransactions.length,
+                itemBuilder: (context, index) =>
+                    _buildUnifiedTransactionItem(
+                      settledTransactions[index],
+                      context,
+                      ref,
+                    ),
+              ),
+            ),
+          ),
+          if (isBalanceVisible && allTransactions.isNotEmpty)
+            TextButton(
+              onPressed: () => context.pushNamed('transactions'),
+              child: Text(
+                'See all transactions'.i18n,
+                style: const TextStyle(color: Colors.white, fontSize: 16),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+// --- (All _build...TransactionItem and other helper widgets are unchanged) ---
+Widget _buildUnifiedTransactionItem(
+    BaseTransaction transaction, BuildContext context, WidgetRef ref) {
+  if (transaction is SideswapPegTransaction) {
+    return _buildSideswapPegTransactionItem(transaction, context, ref);
+  }
+  if (transaction is BitcoinTransaction) {
+    return _buildBitcoinTransactionItem(transaction, context, ref);
+  }
+  if (transaction is LiquidTransaction) {
+    return _buildLiquidTransactionItem(transaction, context, ref);
+  }
+  if (transaction is EulenTransaction) {
+    return _buildEulenTransactionItem(transaction, context, ref);
+  }
+  if (transaction is NoxTransaction) {
+    return _buildNoxTransactionItem(transaction, context, ref);
+  }
+  if (transaction is LightningConversionTransaction) {
+    return _buildLightningConversionTransactionItem(transaction, context, ref);
+  }
+  if (transaction is SideShiftTransaction) {
+    return _buildSideshiftTransactionItem(transaction, context, ref);
+  }
+  return const SizedBox.shrink();
+}
+
+Widget _buildTransactionItemLayout({
+  required BuildContext context,
+  required WidgetRef ref,
+  required Widget icon,
+  required String title,
+  required String subtitle,
+  required VoidCallback onTap,
+  bool isPending = false,
+  Widget? amountContent,
+}) {
+  return InkWell(
+    onTap: onTap,
+    child: Padding(
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 14.h),
+      child: Row(
+        children: [
           Stack(
             alignment: Alignment.center,
             children: [
-              boltzTransactionTypeIcon(),
+              Container(
+                width: 40.w,
+                height: 40.w,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withOpacity(0.1),
+                ),
+                child: icon,
+              ),
               if (isPending)
                 SizedBox(
-                  width: 40.w,
-                  height: 40.w,
+                  width: 42.w,
+                  height: 42.w,
                   child: const CircularProgressIndicator(
-                    strokeWidth: 3,
+                    strokeWidth: 2.5,
                     valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                    backgroundColor: Colors.transparent,
                   ),
                 ),
             ],
           ),
           SizedBox(width: 12.w),
-          // Transaction details and amount
           Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: TextStyle(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    Text(
-                      formattedDate,
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        color: Colors.grey[400],
-                      ),
-                    ),
-                    Text(
-                      statusText,
-                      style: TextStyle(
-                        fontSize: 12.sp,
-                        color: Colors.grey[400],
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ],
+                Text(
+                  title,
+                  style: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white),
+                  overflow: TextOverflow.ellipsis,
                 ),
-                if (amountText != null)
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Text(
-                        amountText,
-                        style: TextStyle(
-                          fontSize: 14.sp,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                      if (fiatValue != null)
-                        Text(
-                          fiatValue,
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            color: Colors.grey[400],
-                          ),
-                        ),
-                    ],
-                  ),
+                SizedBox(height: 4.h),
+                Text(
+                  subtitle,
+                  style: TextStyle(fontSize: 13.sp, color: Colors.grey[400]),
+                ),
               ],
             ),
           ),
+          if (amountContent != null)
+            Padding(
+              padding: EdgeInsets.only(left: 8.w),
+              child: amountContent,
+            ),
         ],
       ),
     ),
   );
 }
 
+Widget _buildLightningConversionTransactionItem(
+    LightningConversionTransaction transaction,
+    BuildContext context,
+    WidgetRef ref) {
+  final details = transaction.details;
+  final isReceiving = details.paymentType == breez.PaymentType.receive;
+  final title = isReceiving
+      ? "Lightning → Liquid Bitcoin".i18n
+      : "Liquid Bitcoin → Lightning".i18n;
+
+  String subtitle;
+  switch (details.status) {
+    case breez.PaymentState.complete:
+      final locale = I18n.locale.languageCode;
+      subtitle =
+          DateFormat('d MMM, HH:mm', locale).format(transaction.timestamp);
+      break;
+    case breez.PaymentState.failed:
+      subtitle = 'Refunded'.i18n;
+      break;
+    case breez.PaymentState.refundPending:
+      subtitle = 'Refund Pending'.i18n;
+      break;
+    case breez.PaymentState.timedOut:
+      subtitle = 'Timed Out'.i18n;
+      break;
+    case breez.PaymentState.refundable:
+      subtitle = 'Refundable'.i18n;
+      break;
+    case breez.PaymentState.created:
+    case breez.PaymentState.pending:
+    default:
+      subtitle = 'Pending'.i18n;
+      break;
+  }
+
+  final isPending = details.status == breez.PaymentState.created ||
+      details.status == breez.PaymentState.pending ||
+      details.status == breez.PaymentState.refundPending;
+
+  final isCompleted = details.status == breez.PaymentState.complete;
+
+  final denomination = ref.read(settingsProvider).btcFormat;
+  final amountSat = details.amountSat.toInt();
+  final amountString = btcInDenominationFormatted(amountSat, denomination);
+  final fiatValue =
+  lightningConversionTransactionAmountInFiat(transaction, ref);
+
+  return _buildTransactionItemLayout(
+    context: context,
+    ref: ref,
+    onTap: () {
+      ref.read(selectedLightningTransactionProvider.notifier).state =
+          transaction;
+      context.pushNamed('lightningConversionTransactionDetails');
+    },
+    icon: lightningTransactionTypeIcon(),
+    isPending: isPending,
+    title: title,
+    subtitle: subtitle,
+    amountContent: isCompleted
+        ? Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          amountString,
+          style: TextStyle(
+            fontSize: 14.sp,
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        SizedBox(height: 2.h),
+        Text(
+          fiatValue,
+          style: TextStyle(fontSize: 12.sp, color: Colors.grey[400]),
+        ),
+      ],
+    )
+        : null,
+  );
+}
 
 Widget _buildSideshiftTransactionItem(
-    SideShiftTransaction transaction,
-    BuildContext context,
-    WidgetRef ref,
-    ) {
+    SideShiftTransaction transaction, BuildContext context, WidgetRef ref) {
   final details = transaction.details;
-
-  // Determine if the transaction is confirmed or pending
-  final isConfirmed = details.status == "settled" || details.status == "expired";
-  final isPending = !isConfirmed && details.status != "failed" && details.status != "expired";
-
-  // Map the status to a user-friendly text
-  String statusText;
-  switch (details.status) {
-    case 'waiting':
-      statusText = 'Waiting for deposit'.i18n;
-      break;
-    case 'pending':
-      statusText = 'Detected'.i18n;
-      break;
-    case 'processing':
-      statusText = 'Confirmed'.i18n;
-      break;
-    case 'review':
-      statusText = 'Under human review'.i18n;
-      break;
-    case 'settling':
-      statusText = 'Settlement in progress'.i18n;
-      break;
-    case 'settled':
-      statusText = 'Settlement completed'.i18n;
-      break;
-    case 'refund':
-      statusText = 'Queued for refund'.i18n;
-      break;
-    case 'refunding':
-      statusText = 'Refund in progress'.i18n;
-      break;
-    case 'refunded':
-      statusText = 'Refund completed'.i18n;
-      break;
-    case 'expired':
-      statusText = 'Shift expired'.i18n;
-      break;
-    case 'multiple':
-      statusText = 'Multiple deposits detected'.i18n;
-      break;
-    default:
-      statusText = 'Unknown'.i18n;
-      break;
-  }
-
-  // Transaction title showing the shift direction
-  String title = '';
-  if (['solana', 'bsc', 'ethereum'].contains(details.depositNetwork.toLowerCase())) {
-    title = "${details.depositCoin} ${"to".i18n} ${details.settleNetwork.capitalize()} ${details.settleCoin}";
-  } else {
-    title = "${details.depositNetwork.capitalize()} ${details.depositCoin} ${"to".i18n} ${details.settleNetwork.capitalize()} ${details.settleCoin}";
-  }
-  String locale = I18n.locale.languageCode ?? 'en';
-  // Format the transaction date
+  final isPending =
+  !['settled', 'expired', 'failed', 'refunded'].contains(details.status);
+  final title =
+      "${details.depositNetwork.capitalize()} ${details.depositCoin.toUpperCase()} → ${details.settleNetwork.capitalize()} ${details.settleCoin.toUpperCase()}";
+  final locale = I18n.locale.languageCode;
   final formattedDate =
-  DateFormat('d, MMMM, HH:mm', locale).format(transaction.timestamp);
+  DateFormat('d MMM, HH:mm', locale).format(transaction.timestamp);
+  final statusText =
+  isPending ? sideshift.getStatusText(details.status) : formattedDate;
 
-  return GestureDetector(
-    onTap: () {
-      context.pushNamed('sideshiftTransactionDetails', extra: transaction);
-    },
-    behavior: HitTestBehavior.opaque,
-    child: Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Transaction type icon with optional progress indicator
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  sideshiftTransactionTypeIcon(),
-                  if (isPending)
-                    SizedBox(
-                      width: 40.w,
-                      height: 40.w,
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                        backgroundColor: Colors.transparent,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            title,
-                            style: TextStyle(
-                              fontSize: 16.sp,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                          Text(
-                            formattedDate,
-                            style: TextStyle(
-                              fontSize: 14.sp,
-                              color: Colors.grey[400],
-                            ),
-                          ),
-                          Text(
-                            statusText,
-                            style: TextStyle(
-                                fontSize: 12.sp,
-                                color: Colors.grey[400],
-                                fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                    if (isConfirmed)
-                          () {
-                        // Use an IIFE to scope the logic for calculating amount text
-                        final btcFormat = ref.watch(settingsProvider).btcFormat;
-                        String amountText;
-
-                        if (details.settleCoin.toLowerCase() == 'btc') {
-                          final amountInSats =
-                          (double.parse(details.settleAmount) * 100000000)
-                              .toInt();
-                          amountText =
-                          "${btcInDenominationFormatted(amountInSats, btcFormat)} ${btcFormat.toUpperCase()}";
-                        } else {
-                          amountText =
-                          "${double.parse(details.settleAmount).toStringAsFixed(2)} ${details.settleCoin.toUpperCase()}";
-                        }
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              amountText,
-                              style: TextStyle(
-                                fontSize: 14.sp,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        );
-                      }(),
-                  ],
-                ),
-              ),
-            ],
+  return _buildTransactionItemLayout(
+    context: context,
+    ref: ref,
+    onTap: () =>
+        context.pushNamed('sideshiftTransactionDetails', extra: transaction),
+    icon: sideshiftTransactionTypeIcon(),
+    isPending: isPending,
+    title: title,
+    subtitle: statusText,
+    amountContent: details.status == 'settled'
+        ? Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        if (details.depositAmount != null)
+          Text(
+            "- ${details.depositAmount} ${details.depositCoin.toUpperCase()}",
+            style: TextStyle(
+                fontSize: 12.sp,
+                fontWeight: FontWeight.normal,
+                color: Colors.white.withOpacity(0.7)),
           ),
-        ],
-      ),
-    ),
+        SizedBox(height: 2.h),
+        if (details.settleAmount != null)
+          Text(
+            "${double.parse(details.settleAmount!).toStringAsFixed(2)} ${details.settleCoin.toUpperCase()}",
+            style: TextStyle(
+                fontSize: 14.sp,
+                fontWeight: FontWeight.bold,
+                color: Colors.white),
+          ),
+      ],
+    )
+        : null,
   );
 }
 
 Widget _buildSideswapPegTransactionItem(
     SideswapPegTransaction transaction, BuildContext context, WidgetRef ref) {
-  final sideswapPegDetails = transaction.sideswapPegDetails;
-
-  final date = sideswapPegDetails.list?.isNotEmpty == true &&
-      sideswapPegDetails.list!.first.createdAt != null
-      ? DateTime.fromMillisecondsSinceEpoch(
-      sideswapPegDetails.list!.first.createdAt!)
+  final details = transaction.sideswapPegDetails;
+  final title = details.pegIn == true
+      ? 'Bitcoin → Liquid Bitcoin'
+      : 'Liquid Bitcoin → Bitcoin';
+  final date = details.list?.firstOrNull?.createdAt != null
+      ? DateTime.fromMillisecondsSinceEpoch(details.list!.first.createdAt!)
       : transaction.timestamp;
+  final locale = I18n.locale.languageCode;
+  final formattedDate = DateFormat('d MMM, HH:mm', locale).format(date);
 
-  String locale = I18n.locale.languageCode ?? 'en';
-  final formattedDate = DateFormat('d MMMM, HH:mm', locale).format(date);
-
-  // Transaction type
-  final transactionType =
-  sideswapPegDetails.pegIn == true ? 'BTC ${"to".i18n} L-BTC' : 'L-BTC ${"to".i18n} BTC';
-
-  return GestureDetector(
+  return _buildTransactionItemLayout(
+    context: context,
+    ref: ref,
     onTap: () {
-      // Update providers and navigate
-      ref.read(orderIdStatusProvider.notifier).state =
-          sideswapPegDetails.orderId ?? '';
-      ref.read(pegInStatusProvider.notifier).state =
-          sideswapPegDetails.pegIn ?? false;
+      ref.read(orderIdStatusProvider.notifier).state = details.orderId ?? '';
+      ref.read(pegInStatusProvider.notifier).state = details.pegIn ?? false;
       context.pushNamed('pegDetails', extra: transaction.sideswapPegDetails);
     },
-    behavior: HitTestBehavior.opaque,
-    child: Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              pegTransactionTypeIcon(),
-              SizedBox(width: 12.w), // Responsive spacing
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    // Transaction type and date
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          transactionType,
-                          style: TextStyle(
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          formattedDate,
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            color: Colors.grey[400],
-                          ),
-                        ),
-                      ],
-                    ),
-                    // Amount and fiat value
-                    Text(
-                      "See status".i18n,
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+    icon: pegTransactionTypeIcon(),
+    title: title,
+    subtitle: formattedDate,
+    amountContent: Text(
+      "See status".i18n,
+      style: TextStyle(
+          fontSize: 14.sp,
+          fontWeight: FontWeight.bold,
+          color: Colors.white70),
     ),
   );
 }
 
 Widget _buildEulenTransactionItem(
-    EulenTransaction transaction,
-    BuildContext context,
-    WidgetRef ref,
-    ) {
-  final isConfirmed = transaction.isConfirmed;
-  final isPending = !isConfirmed && !transaction.details.failed && transaction.details.status != "expired";
-  final statusText = transaction.details.failed
-      ? "Failed".i18n
-      : transaction.details.completed
-      ? "Completed".i18n
-      : "Pending".i18n;
+    EulenTransaction transaction, BuildContext context, WidgetRef ref) {
+  final details = transaction.details;
+  final isPending =
+      !details.completed && !details.failed && details.status != "expired";
+  final type =
+  details.transactionType.toString() == "BUY" ? "Purchase" : "Withdrawal";
+  final title = details.transactionType.toString() == "BUY"
+      ? "${details.to_currency} $type".i18n
+      : "${details.from_currency} $type".i18n;
+  final locale = I18n.locale.languageCode;
+  final formattedDate =
+  DateFormat('d MMM, HH:mm', locale).format(transaction.timestamp);
+  final statusText = isPending ? (details.statusText) : formattedDate;
+  final isBuy = details.transactionType.toString() == "BUY";
 
-  final type = transaction.details.transactionType.toString() == "BUY" ? "(Purchase)".i18n : "(Withdrawal)".i18n;
-  final title = "${transaction.details.to_currency} $type";
-  final amount = transaction.details.receivedAmount.toString();
-  String locale = I18n.locale.languageCode ?? 'en';
-  final formattedDate = DateFormat('d, MMMM, HH:mm', locale).format(transaction.timestamp);
-
-  return GestureDetector(
+  return _buildTransactionItemLayout(
+    context: context,
+    ref: ref,
     onTap: () {
-      ref.read(selectedEulenTransferIdProvider.notifier).state = transaction.details.id;
+      ref.read(selectedEulenTransferIdProvider.notifier).state = details.id;
       context.pushNamed('eulen_transaction_details');
     },
-    behavior: HitTestBehavior.opaque,
-    child: Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Transaction type icon with optional progress indicator
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  eulenTransactionTypeIcon(),
-                  if (isPending)
-                    SizedBox(
-                      width: 40.w,
-                      height: 40.w,
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                        backgroundColor: Colors.transparent,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: TextStyle(
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          formattedDate,
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            color: Colors.grey[400],
-                          ),
-                        ),
-                        Text(
-                          statusText.toString(),
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            color: Colors.grey[400],
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (isConfirmed)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            "$amount ${transaction.details.from_currency}",
-                            style: TextStyle(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          Text(
-                            '${transaction.details.price} USD',
-                            style: TextStyle(
-                              fontSize: 12.sp,
-                              color: Colors.grey[400],
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
+    icon: pixTransactionTypeIcon(),
+    isPending: isPending,
+    title: title,
+    subtitle: statusText,
+    amountContent: details.completed
+        ? Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          "${isBuy ? '' : ''}${details.receivedAmount} ${details.from_currency}",
+          style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.white),
+        ),
+        SizedBox(height: 2.h),
+        Text(
+          "${isBuy ? '' : ''}${details.price?.toStringAsFixed(2)} USD",
+          style: TextStyle(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.normal,
+              color: Colors.white.withOpacity(0.7)),
+        ),
+      ],
+    )
+        : null,
   );
 }
 
 Widget _buildNoxTransactionItem(
-    NoxTransaction transaction,
-    BuildContext context,
-    WidgetRef ref,
-    ) {
-  final isConfirmed = transaction.isConfirmed;
-  final isPending = !isConfirmed && !transaction.details.failed && transaction.details.status != "expired";
-  final statusText = transaction.details.failed
-      ? "Failed".i18n
-      : transaction.details.completed
-      ? "Completed".i18n
-      : "Pending".i18n;
+    NoxTransaction transaction, BuildContext context, WidgetRef ref) {
+  final details = transaction.details;
+  final isPending = !details.completed && !details.failed;
+  final type =
+  details.transactionType.toString() == "BUY" ? "Purchase" : "Withdrawal";
+  final title = details.transactionType.toString() == "BUY"
+      ? "${details.to_currency} $type".i18n
+      : "${details.from_currency} $type".i18n;
+  final locale = I18n.locale.languageCode;
+  final formattedDate =
+  DateFormat('d MMM, HH:mm', locale).format(transaction.timestamp);
+  final statusText = isPending ? (details.statusText).capitalize() : formattedDate;
+  final isBuy = details.transactionType.toString() == "BUY";
 
-  final type = transaction.details.transactionType.toString() == "BUY" ? "Purchase".i18n : "Withdrawal".i18n;
-  final title = "${transaction.details.to_currency} (${type.i18n})";
-  final amount = transaction.details.receivedAmount.toString();
-  String locale = I18n.locale.languageCode ?? 'en';
-  final formattedDate = DateFormat('d, MMMM, HH:mm', locale).format(transaction.timestamp);
-
-  return GestureDetector(
+  return _buildTransactionItemLayout(
+    context: context,
+    ref: ref,
     onTap: () {
-      ref.read(selectedNoxTransferIdProvider.notifier).state = transaction.details.id;
+      ref.read(selectedNoxTransferIdProvider.notifier).state =
+          transaction.details.id;
       context.pushNamed('nox_transaction_details');
     },
-    behavior: HitTestBehavior.opaque,
-    child: Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Transaction type icon with optional progress indicator
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  eulenTransactionTypeIcon(), // Note: Assuming Nox uses same icon as Eulen; adjust if different
-                  if (isPending)
-                    SizedBox(
-                      width: 40.w,
-                      height: 40.w,
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                        backgroundColor: Colors.transparent,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          title,
-                          style: TextStyle(
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          formattedDate,
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            color: Colors.grey[400],
-                          ),
-                        ),
-                        Text(
-                          statusText.toString(),
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            color: Colors.grey[400],
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (isConfirmed)
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            "$amount ${transaction.details.from_currency}",
-                            style: TextStyle(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          Text(
-                            '${transaction.details.price} USD',
-                            style: TextStyle(
-                              fontSize: 12.sp,
-                              color: Colors.grey[400],
-                            ),
-                          ),
-                        ],
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    ),
+    icon: pixTransactionTypeIcon(),
+    isPending: isPending,
+    title: title,
+    subtitle: statusText,
+    amountContent: details.completed
+        ? Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          "${isBuy ? '-' : ''}${details.price} USD",
+          style: TextStyle(
+              fontSize: 12.sp,
+              fontWeight: FontWeight.normal,
+              color: Colors.white.withOpacity(0.7)),
+        ),
+        SizedBox(height: 2.h),
+        Text(
+          "${isBuy ? '' : '-'}${details.receivedAmount} ${details.from_currency}",
+          style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.white),
+        ),
+      ],
+    )
+        : null,
   );
 }
 
 Widget _buildBitcoinTransactionItem(
     BitcoinTransaction transaction, BuildContext context, WidgetRef ref) {
-  // Determine if the transaction is confirmed
-  final isConfirmed = transaction.btcDetails.confirmationTime != null;
-  final isPending = !isConfirmed;
+  final details = transaction.btcDetails;
+  final isPending = details.confirmationTime == null;
+  final title = "Bitcoin";
+  final timestamp = isPending
+      ? transaction.timestamp
+      : DateTime.fromMillisecondsSinceEpoch(
+      details.confirmationTime!.timestamp.toInt() * 1000);
+  final locale = I18n.locale.languageCode;
+  final formattedDate = DateFormat('d MMM, HH:mm', locale).format(timestamp);
+  final statusText = isPending ? "Pending".i18n : formattedDate;
 
-  // Format the transaction date
-  final timestamp = transaction.btcDetails.confirmationTime?.timestamp != null
-      ? DateTime.fromMillisecondsSinceEpoch(
-      transaction.btcDetails.confirmationTime!.timestamp.toInt() * 1000)
-      : transaction.timestamp;
-  String locale = I18n.locale.languageCode ?? 'en';
-  final formattedDate = DateFormat('d, MMMM, HH:mm', locale).format(timestamp);
-
-  return GestureDetector(
-    onTap: () {
-      context.pushNamed('transactionDetails', extra: transaction);
-    },
-    behavior: HitTestBehavior.opaque,
-    child: Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Transaction type icon with optional progress indicator
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  transactionTypeIcon(transaction.btcDetails),
-                  if (isPending)
-                    SizedBox(
-                      width: 40.w,
-                      height: 40.w,
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                        backgroundColor: Colors.transparent,
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          "Bitcoin",
-                          style: TextStyle(
-                            fontSize: 16.sp,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          formattedDate,
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            color: Colors.grey[400],
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          transactionAmount(transaction.btcDetails, ref),
-                          style: TextStyle(
-                            fontSize: 14.sp,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          transactionAmountInFiat(transaction.btcDetails, ref),
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            color: Colors.grey[400],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
+  return _buildTransactionItemLayout(
+    context: context,
+    ref: ref,
+    onTap: () => context.pushNamed('transactionDetails', extra: transaction),
+    icon: transactionTypeIcon(details),
+    isPending: isPending,
+    title: title,
+    subtitle: statusText,
+    amountContent: Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        Text(
+          transactionAmount(details, ref).replaceFirst('+', ''),
+          style: TextStyle(
+              fontSize: 14.sp,
+              fontWeight: FontWeight.bold,
+              color: Colors.white),
+        ),
+        Text(
+          transactionAmountInFiat(details, ref),
+          style: TextStyle(fontSize: 12.sp, color: Colors.grey[400]),
+        ),
+      ],
     ),
   );
 }
 
 Widget _buildLiquidTransactionItem(
     LiquidTransaction transaction, BuildContext context, WidgetRef ref) {
-  final isConfirmed = transaction.lwkDetails.timestamp != null;
-  final isPending = !isConfirmed;
-
-  // Format the transaction date
-  final timestamp = transaction.lwkDetails.timestamp != null
-      ? DateTime.fromMillisecondsSinceEpoch(transaction.lwkDetails.timestamp! * 1000)
-      : transaction.timestamp;
-  String locale = I18n.locale.languageCode ?? 'en';
-  final formattedDate = DateFormat('d, MMMM, HH:mm', locale).format(timestamp);
-
-  // Filter balances: exclude small LBTC balances when there are multiple balances
-  final balancesToShow = transaction.lwkDetails.balances.where((balance) {
-    if (transaction.lwkDetails.balances.length > 1 &&
-        balance.assetId == AssetMapper.reverseMapTicker(AssetId.LBTC)) {
-      final satoshiValue = balance.value.abs();
-      if (satoshiValue < 100) {
-        return false; // Exclude small LBTC balance
-      }
+  final details = transaction.lwkDetails;
+  final isPending = details.timestamp == null;
+  final balancesToShow = details.balances.where((b) {
+    if (details.balances.length > 1 &&
+        b.assetId == AssetMapper.reverseMapTicker(AssetId.LBTC) &&
+        b.value.abs() < 100) {
+      return false;
     }
-    return true; // Include all other balances
+    return true;
   }).toList();
 
-  // Separate balances into negative and positive
-  final negativeBalances = balancesToShow.where((b) => b.value < 0).toList();
-  final positiveBalances = balancesToShow.where((b) => b.value > 0).toList();
+  final positiveTickers = balancesToShow
+      .where((b) => b.value > 0)
+      .map((b) => AssetMapper.mapAsset(b.assetId).name)
+      .toSet()
+      .toList();
+  final negativeTickers = balancesToShow
+      .where((b) => b.value < 0)
+      .map((b) => AssetMapper.mapAsset(b.assetId).name)
+      .toSet()
+      .toList();
 
-  // Get unique tickers for negative and positive balances
-  final negativeTickers =
-  negativeBalances.map((b) => AssetMapper.mapAsset(b.assetId).name).toSet().toList();
-  final positiveTickers =
-  positiveBalances.map((b) => AssetMapper.mapAsset(b.assetId).name).toSet().toList();
-
-  // Construct tickerDisplay based on balances
-  String tickerDisplay;
+  String title;
   if (negativeTickers.isNotEmpty) {
     final negativeStr = negativeTickers.join(' + ');
     final positiveStr = positiveTickers.join(' + ');
-    tickerDisplay = positiveStr.isNotEmpty ? '$negativeStr ${"to".i18n} $positiveStr' : negativeStr;
+    title = positiveStr.isNotEmpty ? '$negativeStr → $positiveStr' : negativeStr;
   } else {
-    tickerDisplay = positiveTickers.join(' + ');
+    title = positiveTickers.join(' + ');
   }
 
-  return GestureDetector(
-    onTap: () {
-      context.pushNamed('liquidTransactionDetails', extra: transaction);
-    },
-    child: Padding(
-      padding: const EdgeInsets.all(12.0),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+  final timestamp = isPending
+      ? transaction.timestamp
+      : DateTime.fromMillisecondsSinceEpoch(details.timestamp! * 1000);
+  final locale = I18n.locale.languageCode;
+  final formattedDate = DateFormat('d MMM, HH:mm', locale).format(timestamp);
+  final statusText = isPending ? "Pending".i18n : formattedDate;
+
+  return _buildTransactionItemLayout(
+    context: context,
+    ref: ref,
+    onTap: () =>
+        context.pushNamed('liquidTransactionDetails', extra: transaction),
+    icon: transactionTypeLiquidIcon(details.kind),
+    isPending: isPending,
+    title: title.replaceFirst('L-BTC', 'Liquid Bitcoin'),
+    subtitle: statusText,
+    amountContent: Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: balancesToShow.map((balance) {
+        final asset = AssetMapper.mapAsset(balance.assetId);
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 2.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
             children: [
-              // Transaction type icon with optional progress indicator
-              Stack(
-                alignment: Alignment.center,
-                children: [
-                  transactionTypeLiquidIcon(transaction.lwkDetails.kind),
-                  if (isPending)
-                    SizedBox(
-                      width: 40.w,
-                      height: 40.w,
-                      child: const CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.orange),
-                        backgroundColor: Colors.transparent,
-                      ),
-                    ),
-                ],
+              Text(
+                valueOfLiquidSubTransaction(asset, balance.value, ref)
+                    .replaceFirst('+', ''),
+                style: TextStyle(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white),
               ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      tickerDisplay == 'L-BTC' ? "Liquid Bitcoin" : tickerDisplay,
-                      style: TextStyle(
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      formattedDate,
-                      style: TextStyle(
-                        fontSize: 14.sp,
-                        color: Colors.grey[400],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (balancesToShow.isNotEmpty)
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: balancesToShow.map((balance) {
-                    final asset = AssetMapper.mapAsset(balance.assetId);
-                    final value = valueOfLiquidSubTransaction(asset, balance.value, ref);
-                    final fiatValue = asset == AssetId.LBTC
-                        ? liquidTransactionAmountInFiat(balance, ref)
-                        : '';
-                    return Padding(
-                      padding: const EdgeInsets.only(bottom: 4.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        children: [
-                          Text(
-                            "$value${asset.name == 'L-BTC' ? '' : " ${asset.name}"}",
-                            style: TextStyle(
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                            ),
-                          ),
-                          if (fiatValue.isNotEmpty)
-                            Text(
-                              fiatValue,
-                              style: TextStyle(
-                                fontSize: 12.sp,
-                                color: Colors.grey[400],
-                              ),
-                            ),
-                        ],
-                      ),
-                    );
-                  }).toList(),
+              if (asset == AssetId.LBTC)
+                Text(
+                  liquidTransactionAmountInFiat(balance, ref),
+                  style: TextStyle(fontSize: 12.sp, color: Colors.grey[400]),
                 ),
             ],
           ),
-        ],
-      ),
+        );
+      }).toList(),
     ),
   );
 }

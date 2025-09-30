@@ -1,10 +1,10 @@
+import 'package:Satsails/helpers/bitcoin_formart_converter.dart';
 import 'package:Satsails/helpers/string_extension.dart';
 import 'package:Satsails/models/nox_transfer_model.dart';
-import 'package:Satsails/providers/currency_conversions_provider.dart';
 import 'package:Satsails/providers/nox_transfer_provider.dart';
 import 'package:Satsails/providers/settings_provider.dart';
 import 'package:Satsails/screens/shared/message_display.dart';
-import 'package:Satsails/translations/translations.dart';
+import 'package:Satsails/translations/localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -12,299 +12,214 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
-class NoxTransactionDetails extends ConsumerStatefulWidget {
+class NoxTransactionDetails extends ConsumerWidget {
   const NoxTransactionDetails({super.key});
 
-  @override
-  _NoxTransactionDetailsState createState() => _NoxTransactionDetailsState();
-}
+  /// Formats a currency amount, handling BTC/sats conversion based on user settings.
+  String _formatCurrencyAmount(double amount, String currency, WidgetRef ref) {
+    if (currency.toUpperCase() == 'BTC') {
+      final denomination = ref.read(settingsProvider).btcFormat;
+      // Convert the BTC amount to sats for the formatter.
+      final satsAmount = (amount * 100000000).toInt();
+      // Use the helper to format into either BTC or sats string.
+      return "${btcInDenominationFormatted(satsAmount, denomination)} $denomination";
+    }
+    // For other currencies, format to 2 decimal places with grouping.
+    return "${NumberFormat('#,##0.00').format(amount)} $currency";
+  }
 
-class _NoxTransactionDetailsState extends ConsumerState<NoxTransactionDetails> {
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final transaction = ref.watch(singleNoxTransfersDetailsProvider);
+
+    if (transaction == null) {
+      return Scaffold(
+        backgroundColor: Colors.black,
+        appBar: AppBar(backgroundColor: Colors.black),
+        body: Center(
+          child: Text(
+            'Transaction not found.'.i18n,
+            style: const TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
 
     return Scaffold(
       appBar: AppBar(
         centerTitle: false,
-        title: Text(
-          'Transaction Details'.i18n,
-          style: TextStyle(color: Colors.white, fontSize: 22.sp, fontWeight: FontWeight.bold,),
-        ),
+        title: Text('Transaction Details'.i18n, style: TextStyle(color: Colors.white, fontSize: 22.sp, fontWeight: FontWeight.bold)),
         backgroundColor: Colors.black,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 24.w),
-          onPressed: () => context.pop(),
-        ),
+        leading: IconButton(icon: Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 24.w), onPressed: () => context.pop()),
       ),
       backgroundColor: Colors.black,
       body: SingleChildScrollView(
-        child: Container(
-          margin: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-          padding: EdgeInsets.all(16.w),
-          decoration: BoxDecoration(
-            color: const Color(0x00333333).withOpacity(0.4),
-            borderRadius: BorderRadius.circular(12.r),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.5),
-                blurRadius: 4.r,
-                offset: Offset(0, 2.h),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(child: _buildTransactionHeader(ref, transaction)),
-              SizedBox(height: 16.h),
-              Divider(color: Colors.grey.shade700),
-              SizedBox(height: 16.h),
-              Text(
-                "About the transaction".i18n,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18.sp,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              SizedBox(height: 16.h),
-              _buildTransactionDetails(ref, transaction),
-              if (transaction.completed) ...[
-                SizedBox(height: 16.h),
-                Divider(color: Colors.grey.shade700),
-                SizedBox(height: 16.h),
-                Text(
-                  "Fees".i18n,
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18.sp,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ],
-          ),
+        padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+        child: Column(
+          children: [
+            _buildHeader(context, ref, transaction),
+            SizedBox(height: 24.h),
+            _buildDetailsCard(context, ref, transaction),
+          ],
         ),
       ),
     );
   }
 
-  Widget _buildTransactionHeader(WidgetRef ref, NoxTransfer transaction) {
-    final isBuy = transaction.transactionType == "BUY";
-    final sentLabel = isBuy ? "Paid".i18n : "Sent".i18n;
-    final sentAmount = "${transaction.originalAmount.toStringAsFixed(2)} ${transaction.from_currency ?? 'N/A'}";
-    final receivedLabel = "Received".i18n;
-    final receivedAmount = "${transaction.receivedAmount.toStringAsFixed(2)} ${transaction.to_currency ?? 'N/A'}";
-    final statusIcon = transaction.failed
-        ? Icons.error_rounded
-        : transaction.completed
-        ? Icons.check_circle_rounded
-        : Icons.access_time_rounded;
-    final statusColor = transaction.failed
-        ? Colors.red
-        : transaction.completed
-        ? Colors.green
-        : Colors.orange;
-    final statusText = transaction.status ?? (transaction.failed
-        ? "Failed".i18n
-        : transaction.completed
-        ? "Completed".i18n
-        : "Pending".i18n);
+  Widget _buildHeader(BuildContext context, WidgetRef ref, NoxTransfer transaction) {
+    final statusIcon = transaction.failed ? Icons.error_rounded : transaction.completed ? Icons.check_circle_rounded : Icons.access_time_rounded;
+    final statusColor = transaction.failed ? Colors.red : transaction.completed ? Colors.green : Colors.orange;
 
-    return Column(
-      children: [
-        Icon(statusIcon, color: statusColor, size: 40.w),
-        SizedBox(height: 8.h),
-        Text(
-          transaction.transactionType?.i18n ?? 'Unknown'.i18n,
-          style: TextStyle(
-            fontSize: 18.sp,
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          ),
-        ),
-        Text(
-          statusText.capitalize(),
-          style: TextStyle(
-            fontSize: 16.sp,
-            fontWeight: FontWeight.bold,
-            color: statusColor,
-          ),
-        ),
-        SizedBox(height: 16.h),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: [
-            Column(
-              children: [
-                Text(sentLabel, style: TextStyle(color: Colors.grey, fontSize: 14.sp)),
-                Text(
-                  sentAmount,
-                  style: TextStyle(
-                    color: Colors.red,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20.sp,
-                  ),
-                ),
-              ],
-            ),
-            Column(
-              children: [
-                Text(receivedLabel, style: TextStyle(color: Colors.grey, fontSize: 14.sp)),
-                Text(
-                  receivedAmount,
-                  style: TextStyle(
-                    color: Colors.green,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 20.sp,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-        if (transaction.completed)
-          Padding(
-            padding: EdgeInsets.only(top: 16.h),
-            child: GestureDetector(
-              onTap: () {
-                Clipboard.setData(ClipboardData(text: transaction.transactionId));
-                showMessageSnackBar(
-                  message: 'Transfer ID copied'.i18n,
-                  error: false,
-                  context: context,
-                );
-              },
-              child: Text(
-                transaction.transactionId,
-                style: TextStyle(color: Colors.white, fontSize: 14.sp),
-              ),
-            ),
-          ),
-      ],
+    // Use the helper to format amounts, which will handle BTC/sats conversion.
+    final sentAmount = _formatCurrencyAmount(transaction.originalAmount, transaction.from_currency ?? 'N/A', ref);
+    final receivedAmount = _formatCurrencyAmount(transaction.receivedAmount, transaction.to_currency ?? 'N/A', ref);
+
+    return Container(
+      width: double.infinity,
+      padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 20.h),
+      decoration: BoxDecoration(color: const Color(0x00333333).withOpacity(0.4), borderRadius: BorderRadius.circular(20.r)),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(statusIcon, color: statusColor, size: 40.w),
+          SizedBox(height: 16.h),
+          Text("You Sent".i18n, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16.sp)),
+          SizedBox(height: 4.h),
+          Text(sentAmount, style: TextStyle(color: Colors.white, fontSize: 24.sp, fontWeight: FontWeight.bold)),
+          SizedBox(height: 16.h),
+          Text("You Received".i18n, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16.sp)),
+          SizedBox(height: 4.h),
+          Text(receivedAmount, style: TextStyle(color: Colors.white, fontSize: 24.sp, fontWeight: FontWeight.bold)),
+        ],
+      ),
     );
   }
 
-  Widget _buildTransactionDetails(WidgetRef ref, NoxTransfer transaction) {
-    final status = transaction.status;
-    final currency = ref.read(settingsProvider).currency;
-    final currencyConversionFromUsd = ref.read(selectedCurrencyProviderFromUSD(currency));
+  Widget _buildDetailsCard(BuildContext context, WidgetRef ref, NoxTransfer transaction) {
+    return Container(
+      padding: EdgeInsets.all(16.w),
+      decoration: BoxDecoration(color: const Color(0x00333333).withOpacity(0.4), borderRadius: BorderRadius.circular(20.r)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _buildSectionHeader("Transaction Info".i18n),
+          _buildTransactionDetails(context, ref, transaction),
 
-    // Map status values to display text with internationalization
-    String statusText;
-    switch (status) {
-      case "quote":
-        statusText = "Quote".i18n;
-        break;
-      case "KYC":
-        statusText = "KYC".i18n;
-        break;
-      case "depositpix":
-        statusText = "Deposit Pix".i18n;
-        break;
-      case "success":
-        statusText = "Success".i18n;
-        break;
-      default:
-        statusText = status?.i18n ?? "Unknown".i18n; // Fallback for unknown statuses
-    }
+          if (transaction.completed) ...[
+            Divider(color: Colors.white.withOpacity(0.1), height: 32.h),
+            _buildSectionHeader("Fees & Rate".i18n),
+            _buildFeeAndRateDetails(ref, transaction),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSectionHeader(String title) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8.h),
+      child: Text(title, style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.bold)),
+    );
+  }
+
+  Widget _buildTransactionDetails(BuildContext context, WidgetRef ref, NoxTransfer transaction) {
+    final statusText = transaction.statusText;
+    final subStatusText = transaction.subStatusText;
+    final statusColor = transaction.failed ? Colors.red : transaction.completed ? Colors.green : Colors.orange;
     final dateFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
 
     return Column(
       children: [
-        TransactionDetailRow(label: "ID".i18n, value: transaction.id.toString()),
+        TransactionDetailRow(label: "Type".i18n, value: transaction.transactionType?.i18n ?? 'Unknown'.i18n),
+        TransactionDetailRow(label: "Status".i18n, value: statusText, valueColor: statusColor),
+
+        if (transaction.subStatus != null && transaction.subStatus!.isNotEmpty)
+          TransactionDetailRow(label: "Sub-Status".i18n, value: subStatusText, valueColor: statusColor),
+
+        TransactionDetailRow(label: "Provider".i18n, value: transaction.provider ?? "N/A"),
+        TransactionDetailRow(label: "Payment Method".i18n, value: transaction.paymentMethod ?? "N/A".i18n),
+        TransactionDetailRow(label: "Created At".i18n, value: dateFormat.format(transaction.createdAt)),
+        TransactionDetailRow(label: "Last Updated".i18n, value: dateFormat.format(transaction.updatedAt)),
+
         TransactionDetailRow(
           label: "Transaction ID".i18n,
           value: transaction.transactionId,
           onCopy: () {
             Clipboard.setData(ClipboardData(text: transaction.transactionId));
-            showMessageSnackBar(
-              context: context,
-              message: 'Transaction ID copied'.i18n,
-              error: false,
-              info: true,
-            );
+            showMessageSnackBar(context: context, message: 'Transaction ID copied'.i18n, error: false);
           },
-        ),
-        TransactionDetailRow(
-          label: "Transaction Type".i18n,
-          value: transaction.transactionType?.i18n ?? 'Unknown'.i18n,
-        ),
-        TransactionDetailRow(
-          label: "From".i18n,
-          value: "${transaction.originalAmount.toStringAsFixed(2)} ${transaction.from_currency ?? 'N/A'}",
-        ),
-        TransactionDetailRow(
-          label: "To".i18n,
-          value: "${transaction.receivedAmount.toStringAsFixed(2)} ${transaction.to_currency ?? 'N/A'}",
-        ),
-        TransactionDetailRow(
-          label: "Date".i18n,
-          value: dateFormat.format(transaction.createdAt),
-        ),
-        TransactionDetailRow(label: "Status".i18n, value: statusText),
-        TransactionDetailRow(
-          label: "Payment Method".i18n,
-          value: transaction.paymentMethod ?? "N/A".i18n,
-        ),
-        TransactionDetailRow(
-          label: "Provider".i18n,
-          value: transaction.provider ?? "N/A",
-        ),
-        TransactionDetailRow(
-          label: '${"Value purchased in".i18n} $currency',
-          value: currencyFormat(transaction.price ?? 0 * currencyConversionFromUsd, currency),
         ),
       ],
     );
   }
 
+  Widget _buildFeeAndRateDetails(WidgetRef ref, NoxTransfer transaction) {
+    final fee = (transaction.originalAmount - transaction.receivedAmount).abs();
+    final feePercentage = transaction.originalAmount != 0 ? (fee / transaction.originalAmount) * 100 : 0.0;
+    final feeCurrency = transaction.from_currency ?? 'N/A';
+    final formattedFee = _formatCurrencyAmount(fee, feeCurrency, ref);
+
+    final price = transaction.price ?? 0;
+    final fromCurrency = transaction.from_currency ?? '';
+    final toCurrency = transaction.to_currency ?? '';
+
+    String rateString;
+    if (price > 0) {
+      String toPart;
+      // If the rate is in BTC, format it according to user settings (BTC or sats).
+      if (toCurrency.toUpperCase() == 'BTC') {
+        final denomination = ref.read(settingsProvider).btcFormat;
+        final satsAmount = (price * 100000000).toInt();
+        toPart = "${btcInDenominationFormatted(satsAmount, denomination)} $denomination";
+      } else {
+        // Format other currencies with appropriate precision.
+        toPart = "${NumberFormat('#,##0.00########').format(price)} $toCurrency";
+      }
+      rateString = "1 $fromCurrency ≈ $toPart";
+    } else {
+      rateString = "N/A";
+    }
+
+    return Column(
+      children: [
+        TransactionDetailRow(label: "Exchange Rate".i18n, value: rateString),
+        TransactionDetailRow(label: "Fee".i18n, value: formattedFee),
+        TransactionDetailRow(label: "Fee Percentage".i18n, value: "${feePercentage.toStringAsFixed(2)}%"),
+      ],
+    );
+  }
 }
 
 class TransactionDetailRow extends StatelessWidget {
-  final String label;
-  final String value;
-  final VoidCallback? onCopy;
+  final String label; final String value; final VoidCallback? onCopy; final Color? valueColor;
+  const TransactionDetailRow({super.key, required this.label, required this.value, this.onCopy, this.valueColor});
 
-  const TransactionDetailRow({
-    super.key,
-    required this.label,
-    required this.value,
-    this.onCopy,
-  });
+  String shortenString(String input) {
+    if (input.length <= 12) return input;
+    return '${input.substring(0, 6)}...${input.substring(input.length - 6)}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final bool isLongValue = value.length > 20 && onCopy != null;
     return Padding(
-      padding: EdgeInsets.symmetric(vertical: 8.h),
+      padding: EdgeInsets.symmetric(vertical: 10.h),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: TextStyle(color: Colors.grey, fontSize: 16.sp),
-          ),
+          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.7), fontSize: 16.sp)),
+          SizedBox(width: 16.w),
           Expanded(
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Flexible(
-                  child: Text(
-                    value,
-                    textAlign: TextAlign.right,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: Colors.white, fontSize: 16.sp),
-                  ),
-                ),
-                if (onCopy != null) ...[
-                  SizedBox(width: 8.w),
-                  IconButton(
-                    icon: Icon(Icons.copy, color: Colors.orange, size: 16.w),
-                    onPressed: onCopy,
-                  ),
+            child: GestureDetector(
+              onTap: onCopy,
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Flexible(child: Text(isLongValue ? shortenString(value) : value, textAlign: TextAlign.right, style: TextStyle(color: valueColor ?? Colors.white, fontSize: 16.sp, fontWeight: FontWeight.w500))),
+                  if (onCopy != null) ...[SizedBox(width: 8.w), Icon(Icons.copy, color: Colors.orange, size: 16.w)],
                 ],
-              ],
+              ),
             ),
           ),
         ],

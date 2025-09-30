@@ -42,8 +42,8 @@ final getAmountPurchasedProvider = FutureProvider.autoDispose<String>((ref) asyn
   }
 });
 
-final createEulenTransferRequestProvider = FutureProvider.autoDispose.family<EulenTransfer, int>((ref, amount) async {
-  final auth = ref.read(userProvider).jwt;
+final createEulenTransferRequestProvider = FutureProvider.autoDispose.family<EulenTransfer, double>((ref, amount) async {
+  final auth = ref.watch(userProvider).jwt;
   final liquidAddress = ref.read(addressProvider).liquidAddress;
   final result = await EulenService.createTransaction(auth, amount, liquidAddress);
   if (result.isSuccess && result.data != null) {

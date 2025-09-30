@@ -3,8 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:go_router/go_router.dart';
-import './components/logo.dart';
-import 'package:Satsails/translations/translations.dart';
+import 'package:Satsails/translations/localizations.dart';
 
 class Start extends ConsumerStatefulWidget {
   const Start({super.key});
@@ -13,206 +12,178 @@ class Start extends ConsumerStatefulWidget {
   _StartState createState() => _StartState();
 }
 
-class _StartState extends ConsumerState<Start>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _logoOpacity;
-  late Animation<double> _logoScale;
-  late Animation<Offset> _logoOffset;
-  late Animation<double> _textOpacity;
-  late Animation<Offset> _buttonsOffset;
-  late Animation<double> _buttonsOpacity;
-
-  // The state and logic for checking the wallet have been removed.
-  // bool _isCheckingWallet = true; <-- REMOVED
+class _StartState extends ConsumerState<Start> with TickerProviderStateMixin {
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
 
   @override
   void initState() {
     super.initState();
 
-    _controller = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 900),
       vsync: this,
     );
 
-    _logoOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.0, 0.5, curve: Curves.easeOut)),
-    );
-    _logoScale = Tween<double>(begin: 0.9, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.0, 0.5, curve: Curves.easeOutBack)),
-    );
-    _logoOffset =
-        Tween<Offset>(begin: const Offset(0, 0.1), end: Offset.zero).animate(
-          CurvedAnimation(
-              parent: _controller,
-              curve: const Interval(0.0, 0.5, curve: Curves.easeOutBack)),
-        );
-
-    _textOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.3, 0.8, curve: Curves.easeOut)),
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeIn,
     );
 
-    _buttonsOffset =
-        Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(
-          CurvedAnimation(
-              parent: _controller,
-              curve: const Interval(0.6, 1.0, curve: Curves.easeOutBack)),
-        );
-    _buttonsOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-          parent: _controller,
-          curve: const Interval(0.6, 1.0, curve: Curves.easeOut)),
-    );
-
-    _controller.forward();
-
-    // The call to _checkExistingWallet() has been removed.
+    // Fade in the UI when the screen loads
+    _fadeController.forward();
   }
-
-  // The _checkExistingWallet() method has been completely removed.
 
   @override
   void dispose() {
-    _controller.dispose();
+    _fadeController.dispose();
     super.dispose();
-  }
-
-  Shader createGradientShader(Rect bounds) {
-    return const LinearGradient(
-      colors: [Colors.redAccent, Colors.orangeAccent],
-      begin: Alignment.centerLeft,
-      end: Alignment.centerRight,
-    ).createShader(bounds);
   }
 
   @override
   Widget build(BuildContext context) {
-    final logoSize = 300.h;
+    // Define the primary orange color for consistency
+    const Color primaryOrange = Color(0xFFF7931A);
 
-    return SafeArea(
-      child: Scaffold(
-        body: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Colors.black, Colors.grey[900]!],
-            ),
-          ),
-          child: Column(
-            children: [
-              Padding(
-                padding: EdgeInsets.only(top: 70.h),
-                child: FadeTransition(
-                  opacity: _logoOpacity,
-                  child: ScaleTransition(
-                    scale: _logoScale,
-                    child: SlideTransition(
-                      position: _logoOffset,
-                      child: SizedBox(
-                        width: logoSize,
-                        height: logoSize,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.5),
-                                blurRadius: 10,
-                                spreadRadius: 2,
-                                offset: const Offset(0, 4),
-                              ),
-                            ],
-                          ),
-                          child: const InitialLogo(),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: FadeTransition(
+        opacity: _fadeAnimation,
+        child: Column(
+          children: [
+            // Image Section
+            Expanded(
+              flex: 1,
+              child: Image.asset(
+                'lib/assets/satsails_start_screen.png', // Using the full background image
+                fit: BoxFit.cover, // Ensures the image covers the area, edge-to-edge
+                width: double.infinity, // Ensures it takes the full width
               ),
-              SizedBox(height: 50.h),
-              FadeTransition(
-                opacity: _textOpacity,
+            ),
+
+            // Content Section (Text and Buttons)
+            Expanded(
+              flex: 1,
+              child: SafeArea(
+                top: false,
                 child: Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 30.w),
+                  padding: EdgeInsets.symmetric(horizontal: 24.w),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        'Satsails',
-                        style: TextStyle(
-                          foreground: Paint()
-                            ..shader = createGradientShader(
-                                Rect.fromLTWH(0.0, 0.0, 0.6.sw, 0.1.sh)),
-                          fontSize: 60.sp,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withOpacity(0.5),
-                              blurRadius: 5,
-                              offset: const Offset(2, 2),
+                      // Text Block
+                      Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(height: 32.h), // Adds space from the top
+                          RichText(
+                            textAlign: TextAlign.center,
+                            text: TextSpan(
+                              style: TextStyle(
+                                fontSize: 36.sp,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                fontFamily: Theme.of(context).textTheme.bodyLarge?.fontFamily,
+                                height: 1.2,
+                              ),
+                              children: [
+                                TextSpan(text: 'Become sovereign\nwith '.i18n),
+                                TextSpan(
+                                  text: 'Satsails',
+                                  style: TextStyle(
+                                    color: primaryOrange,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                          SizedBox(height: 16.h),
+                          Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 20.w),
+                            child: Text(
+                              'The wallet that guarantees sovereignty and the freedom to disconnect from the system'
+                                  .i18n,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 16.sp,
+                                color: Colors.white70,
+                                height: 1.5,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      SizedBox(height: 10.h),
-                      Text(
-                        'Your gateway to financial freedom.'.i18n,
-                        style: TextStyle(
-                          fontSize: 24.sp,
-                          color: Colors.white70,
-                          shadows: [
-                            Shadow(
-                              color: Colors.black.withOpacity(0.5),
-                              blurRadius: 3,
-                              offset: const Offset(1, 1),
+
+                      const Spacer(), // Pushes the buttons and legal text to the bottom
+
+                      // Buttons and Legal Text Group
+                      Column(
+                        children: [
+                          CustomButton(
+                            text: 'Create wallet'.i18n,
+                            onPressed: () => context.push('/set_pin'),
+                            primaryColor: primaryOrange,
+                            secondaryColor:
+                            Color.lerp(primaryOrange, Colors.black, 0.2)!,
+                            textColor: Colors.black,
+                          ),
+                          SizedBox(height: 16.h),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56.h,
+                            child: OutlinedButton(
+                              onPressed: () => context.push('/recover_wallet'),
+                              style: OutlinedButton.styleFrom(
+                                foregroundColor: Colors.white,
+                                side: BorderSide(
+                                    color: Colors.white.withOpacity(0.3)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12.r),
+                                ),
+                              ),
+                              child: Text(
+                                'Recover wallet'.i18n,
+                                style: TextStyle(
+                                  fontSize: 16.sp,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
-                          ],
-                        ),
+                          ),
+                          Padding(
+                            padding: EdgeInsets.fromLTRB(8.w, 24.h, 8.w, 16.h), // Adjusted spacing
+                            child: RichText(
+                              textAlign: TextAlign.center,
+                              text: TextSpan(
+                                style: TextStyle(
+                                  fontSize: 12.sp,
+                                  color: Colors.white38,
+                                  fontFamily: Theme.of(context).textTheme.bodyLarge?.fontFamily,
+                                ),
+                                children: <TextSpan>[
+                                  TextSpan(
+                                      text:
+                                      'By continuing, you agree to our '.i18n),
+                                  const TextSpan(text: '\n'),
+                                  TextSpan(
+                                    text: 'Terms of Use and Privacy Policy'.i18n,
+                                    style: const TextStyle(
+                                        color: Colors.white70),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
                 ),
               ),
-              const Spacer(),
-              SlideTransition(
-                position: _buttonsOffset,
-                child: FadeTransition(
-                  opacity: _buttonsOpacity,
-                  child: Padding(
-                    padding: EdgeInsets.all(20.w),
-                    child: Column(
-                      children: [
-                        CustomButton(
-                          text: 'Create wallet'.i18n,
-                          onPressed: () => context.push('/set_pin'),
-                          primaryColor: Colors.orange,
-                          secondaryColor: Colors.orange,
-                          textColor: Colors.black,
-                        ),
-                        SizedBox(height: 10.h),
-                        CustomButton(
-                          text: 'Recover wallet'.i18n,
-                          onPressed: () => context.push('/recover_wallet'),
-                          primaryColor: Colors.white24,
-                          secondaryColor: Colors.white24,
-                          textColor: Colors.white,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
+

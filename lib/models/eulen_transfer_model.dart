@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 import 'package:Satsails/handlers/response_handlers.dart';
+import 'package:Satsails/helpers/string_extension.dart';
+import 'package:Satsails/translations/localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
@@ -184,6 +186,23 @@ class EulenTransfer extends HiveObject {
     this.cashbackPayed = false,
   });
 
+  String get statusText {
+    switch (status) {
+      case "expired":
+        return "Expired".i18n;
+      case "pending":
+        return "Pending".i18n;
+      case "depix_sent":
+        return "Depix Sent".i18n;
+      case "under_review":
+        return "Under Review".i18n;
+      case "completed":
+        return "Completed".i18n;
+      default:
+        return status?.replaceAll('_', ' ').i18n.capitalize() ?? "Unknown".i18n;
+    }
+  }
+
   factory EulenTransfer.fromJson(Map<String, dynamic> json) {
     final data = json['transfer'] ?? json;
     return EulenTransfer(
@@ -204,7 +223,7 @@ class EulenTransfer extends HiveObject {
       transactionType: data['type']?.toString() ?? 'BUY',
       provider: 'Eulen',
       price: double.tryParse(data['price']?.toString() ?? '') ?? 0.0,
-      cashback: double.tryParse(data['cashback_to_pay_user_in_bitcoin']?.toString() ?? '') ?? 0.0, // Default to 0.0
+      cashback: double.tryParse(data['cashback_to_pay_user']?.toString() ?? '') ?? 0.0, // Default to 0.0
       cashbackPayed: data['cashback_payed'] ?? false, // Default to false
     );
   }
@@ -277,7 +296,7 @@ class EulenTransfer extends HiveObject {
 
 class EulenService {
   /// Creates a new Eulen transaction (purchase or sale).
-  static Future<Result<EulenTransfer>> createTransaction(String auth, int amount, String liquidAddress, {String transactionType = 'BUY'}) async {
+  static Future<Result<EulenTransfer>> createTransaction(String auth, double amount, String liquidAddress, {String transactionType = 'BUY'}) async {
     try {
       // final appCheckToken = await FirebaseAppCheck.instance.getToken();
       final response = await http.post(
@@ -361,7 +380,7 @@ class EulenService {
       return Result(error: 'An error has occurred. Please try again later');
     }
   }
-  /// Checks the transaction payment state using the transaction ID.
+
   static Future<Result<bool>> getTransactionPaymentState(String transactionId, String auth) async {
     try {
       // final appCheckToken = await FirebaseAppCheck.instance.getToken();

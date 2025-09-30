@@ -1,5 +1,5 @@
 import 'package:Satsails/models/auth_model.dart';
-import 'package:Satsails/models/firebase_model.dart';
+import 'package:Satsails/notifications/firebase.dart';
 import 'package:Satsails/models/user_model.dart';
 import 'package:Satsails/providers/address_provider.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -59,19 +59,6 @@ final addAffiliateCodeProvider = FutureProvider.autoDispose.family<void, String>
   }
 });
 
-final addCashbackProvider = FutureProvider.autoDispose<bool>((ref) async {
-  final auth = ref.read(userProvider).jwt;
-  final cashbackAddress = ref.read(addressProvider).liquidAddress;
-  final result = await UserService.addCashbackAddressCode(cashbackAddress, auth);
-
-  if (result.isSuccess && result.data == true) {
-    ref.read(userProvider.notifier).setHasUploadedLiquidAddress(true);
-    return result.data!;
-  } else {
-    throw result.error!;
-  }
-});
-
 final fetchBackendChallangeProvider = FutureProvider.autoDispose<String>((ref) async {
   final result = await BackendAuth.fetchChallenge();
   if (result.isSuccess && result.data != null) {
@@ -96,7 +83,6 @@ final createUserProvider = FutureProvider.autoDispose<void>((ref) async {
     if (affiliateCodeFromLink.isNotEmpty) {
       await ref.read(addAffiliateCodeProvider(affiliateCodeFromLink).future);
     }
-    await ref.read(addCashbackProvider.future);
   } else {
     throw result.error!;
   }
@@ -113,7 +99,32 @@ final migrateUserToJwtProvider = FutureProvider.autoDispose<void>((ref) async {
     ref.read(userProvider.notifier).setJwt(result.data!);
     ref.read(userProvider.notifier).setRecoveryCode('');
     await FirebaseService.storeTokenOnbackend();
-    await ref.read(addCashbackProvider.future);
+  } else {
+    throw result.error!;
+  }
+});
+
+final depositInitializerProvider = FutureProvider.autoDispose<void>((ref) async {
+  final user = ref.read(userProvider);
+
+  if (user.paymentId.isEmpty) {
+    await ref.read(createUserProvider.future);
+  } else {
+    if (user.recoveryCode?.isNotEmpty ?? false) {
+      await ref.read(migrateUserToJwtProvider.future);
+    }
+    if ((user.affiliateCode?.isNotEmpty ?? false) &&
+        !(user.hasUploadedAffiliateCode ?? false)) {
+      await ref.read(addAffiliateCodeProvider(user.affiliateCode!).future);
+    }
+  }
+});
+
+final getUserEulenFeeAmount = FutureProvider.autoDispose<double>((ref) async {
+  final auth = ref.read(userProvider).jwt;
+  final result = await UserService.eulenFeeAmount(auth);
+  if (result.isSuccess && result.data != null) {
+    return result.data!;
   } else {
     throw result.error!;
   }

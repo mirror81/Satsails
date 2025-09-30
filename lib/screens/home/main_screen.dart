@@ -1,66 +1,42 @@
-import 'package:Satsails/providers/background_sync_provider.dart';
 import 'package:Satsails/providers/navigation_provider.dart';
 import 'package:Satsails/providers/send_tx_provider.dart';
-import 'package:Satsails/screens/accounts/accounts.dart';
+import 'package:Satsails/screens/analytics/analytics.dart';
 import 'package:Satsails/screens/exchange/exchange.dart';
 import 'package:Satsails/screens/explore/explore.dart';
 import 'package:Satsails/screens/home/home.dart';
 import 'package:Satsails/screens/settings/settings.dart';
 import 'package:Satsails/screens/shared/custom_bottom_navigation_bar.dart';
+import 'package:Satsails/services/background_sync_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class MainScreen extends ConsumerStatefulWidget {
+// The widget is now a stateless ConsumerWidget.
+class MainScreen extends ConsumerWidget {
   const MainScreen({super.key});
-
-  @override
-  ConsumerState<MainScreen> createState() => _MainScreenState();
-}
-
-class _MainScreenState extends ConsumerState<MainScreen> {
-  bool _isLoopActive = false;
 
   final List<Widget> _screens = const [
     Home(),
-    Accounts(),
+    Analytics(),
     Exchange(),
     Explore(),
     Settings(),
   ];
 
   @override
-  void initState() {
-    super.initState();
-    _startContinuousSync();
-  }
+  Widget build(BuildContext context, WidgetRef ref) {
+    final currentIndex = ref.watch(navigationProvider);
 
-  @override
-  void dispose() {
-    _isLoopActive = false;
-    super.dispose();
-  }
+    // Access the BackgroundSyncService singleton
+    final backgroundSyncService = BackgroundSyncService();
 
-  Future<void> _startContinuousSync() async {
-    _isLoopActive = true;
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      while (_isLoopActive) {
-        try {
-          if (mounted && !ref.read(backgroundSyncInProgressProvider)) {
-            await ref.read(backgroundSyncNotifierProvider.notifier).performFullUpdate();
-          }
-        } catch (e) {
-          debugPrint("Sync loop failed, will retry: $e");
-        }
-
-        await Future.delayed(const Duration(seconds: 5));
+    // Start or stop syncing based on current index
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (currentIndex == 1) {
+        backgroundSyncService.stop();
+      } else {
+        backgroundSyncService.start(ref);
       }
     });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final currentIndex = ref.watch(navigationProvider);
 
     return Scaffold(
       extendBody: true,

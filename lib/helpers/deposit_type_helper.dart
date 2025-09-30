@@ -1,4 +1,4 @@
-import 'package:Satsails/translations/translations.dart';
+import 'package:Satsails/translations/localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -9,10 +9,9 @@ enum DepositMethod { PIX, ApplePay, GooglePay, BankTransfer, CreditCard }
 enum DepositProvider { Eulen, Nox, Chimera, Meld }
 enum CurrencyDeposit { USD, EUR, BRL, CHF, GBP }
 
-final selectedModeProvider = StateProvider<String>((ref) => 'Purchase from Providers');
 final selectedCurrencyProvider = StateProvider<CurrencyDeposit>((ref) => CurrencyDeposit.BRL);
 final selectedPaymentMethodProvider = StateProvider<DepositMethod?>((ref) => DepositMethod.PIX);
-final selectedCryptoTypeProvider = StateProvider<DepositType>((ref) => DepositType.Bitcoin);
+final selectedCryptoTypeProvider = StateProvider<DepositType>((ref) => DepositType.Depix);
 
 final computedDepositProvider = Provider<DepositProvider?>((ref) {
   final paymentMethod = ref.watch(selectedPaymentMethodProvider);
@@ -43,8 +42,7 @@ final availablePaymentMethodsProvider = Provider<List<DepositMethod>>((ref) {
 final availableDepositTypesProvider = Provider<List<DepositType>>((ref) {
   final currency = ref.watch(selectedCurrencyProvider);
   if (currency == CurrencyDeposit.BRL) {
-    // return [DepositType.Bitcoin, DepositType.Depix];
-    return [DepositType.Depix];
+    return [DepositType.Bitcoin, DepositType.Depix];
   } else {
     return DepositType.values.where((type) => type != DepositType.Depix).toList();
   }
@@ -62,28 +60,22 @@ final Map<DepositProvider, ProviderDetails> providerDetails = {
     advantages: [
       "Near-instant deposits",
       "No documentation required",
-      "Minimum purchase: 1 BRL",
-      "Onboarding made by pix metadata on first purchase",
-      "Cashback available"
+      "Minimum purchase: 5 BRL",
     ],
     disadvantages: [
       "Some limitations on purchases due to free nature of depix compared to other assets",
       "Depix token purchases are reported and registered with the Brazilian federal revenue agency under the payers name",
-      "Depix token purchases are returned to the sender bank if CPF/CNPJ diverges for the one registered",
       "Not possible to send documentation and unlock higher purchase amounts.",
-      "Maximum of 5000 BRL per single transaction",
     ],
   ),
   DepositProvider.Nox: ProviderDetails(
     advantages: [
-      "Purchase multiple currencies via smart contacts directly".i18n,
-      "The purchases are sent to a smart contract which then processes the payment. The smart contracts are non custodial".i18n,
       "Near unlimited purchase amounts".i18n,
+      "Direct bitcoin purchases".i18n,
     ],
     disadvantages: [
-      "You have to KYC with the provider".i18n,
-      "You are required to report manually your purchases if your jurisdiction requires it".i18n,
-      "Purchases reported to the Brazilian federal revenue agency under the payer's name as USDC".i18n,
+      "You have to KYC with the provider for big amounts".i18n,
+      "Purchases reported to the Brazilian federal revenue agency under the payer's name".i18n,
     ],
   ),
   DepositProvider.Chimera: ProviderDetails(
@@ -127,8 +119,7 @@ final Map<DepositProvider, KYCAassessment> kycAssessment = {
   ),
   DepositProvider.Nox: KYCAassessment(
     details: [
-      "You are required to report manually your puchases if not USDT if your jurisdiction requires it".i18n,
-      "Purchases reported to the Brazilian federal revenue agency under the payer's name as USDT".i18n,
+      "Purchases reported to the Brazilian federal revenue agency under the payer's name".i18n,
       "*Always comply with the laws of your jurisdiction.".i18n
     ],
     rating: 4.0,

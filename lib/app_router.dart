@@ -1,9 +1,8 @@
 import 'package:Satsails/models/address_model.dart';
 import 'package:Satsails/models/sideswap/sideswap_peg_model.dart';
 import 'package:Satsails/models/transactions_model.dart';
-import 'package:Satsails/screens/pay/components/confirm_boltz_payment.dart';
+import 'package:Satsails/screens/explore/components/sell_pix_nox.dart';
 import 'package:Satsails/screens/pay/components/confirm_non_native_asset_payment.dart';
-import 'package:Satsails/screens/shared/boltz_transactions_details_screen.dart';
 import 'package:Satsails/screens/shared/nox_transaction_details.dart';
 import 'package:Satsails/screens/shared/peg_details.dart';
 import 'package:Satsails/screens/explore/components/deposit_pix_nox.dart';
@@ -14,12 +13,12 @@ import 'package:Satsails/screens/explore/explore.dart';
 import 'package:Satsails/screens/creation/confirm_pin.dart';
 import 'package:Satsails/screens/login/seed_words_pin.dart';
 import 'package:Satsails/screens/pay/components/camera.dart';
-import 'package:Satsails/screens/pay/components/confirm_spark_bitcoin_payment.dart';
+import 'package:Satsails/screens/pay/components/confirm_lightning_payment.dart';
 import 'package:Satsails/screens/pay/components/confirm_liquid_asset_payment.dart';
 import 'package:Satsails/screens/shared/affiliate_screen.dart';
 import 'package:Satsails/screens/shared/liquid_transaction_details_screen.dart';
 import 'package:Satsails/screens/shared/sideshift_transaction_details_screen.dart';
-import 'package:Satsails/screens/shared/transactions_details_screen.dart';
+import 'package:Satsails/screens/shared/bitcoin_transactions_details_screen.dart';
 import 'package:Satsails/screens/spash/splash.dart';
 import 'package:Satsails/screens/transactions/transactions.dart';
 import 'package:go_router/go_router.dart';
@@ -30,11 +29,9 @@ import 'package:Satsails/screens/pay/components/confirm_liquid_payment.dart';
 import 'package:Satsails/screens/settings/components/seed_words.dart';
 import 'package:Satsails/screens/settings/settings.dart';
 import 'package:Satsails/screens/receive/receive.dart';
-import 'package:Satsails/screens/accounts/accounts.dart';
 import 'package:Satsails/screens/creation/set_pin.dart';
 import 'package:Satsails/screens/analytics/analytics.dart';
 import 'package:Satsails/screens/login/open_pin.dart';
-import 'package:Satsails/screens/services/services.dart';
 import 'package:Satsails/screens/creation/recover_wallet.dart';
 import 'package:Satsails/screens/pay/components/confirm_bitcoin_payment.dart';
 import 'package:Satsails/screens/exchange/exchange.dart';
@@ -42,6 +39,8 @@ import 'package:Satsails/screens/home/components/search_modal.dart';
 import 'package:Satsails/screens/settings/components/backup_wallet.dart';
 
 import 'package:flutter/material.dart';
+
+import 'screens/shared/lightning_conversion_transaction_details.dart';
 
 class AppRouter {
   /// Helper method: returns a [CustomTransitionPage] that
@@ -97,20 +96,15 @@ class AppRouter {
   static GoRouter createRouter(String initialRoute) {
     return GoRouter(
       initialLocation: initialRoute,
-      redirect: (BuildContext context, GoRouterState state) {
-        final uri = state.uri;
-        if (uri.scheme == 'https' && uri.host == 'links.satsails.com') {
-          return '/affiliate';
-        }
-        return null; // No redirect by default
-      },
       routes: [
         GoRoute(
           path: '/affiliate',
-          pageBuilder: (context, state) => _buildFadeScalePage(
-            child: const AffiliateScreen(),
-            state: state,
-          ),
+          pageBuilder: (context, state) {
+            return _buildFadeScalePage(
+              child: AffiliateScreen(),
+              state: state,
+            );
+          },
         ),
         GoRoute(
           path: '/splash',
@@ -134,7 +128,7 @@ class AppRouter {
           pageBuilder: (context, state) {
             final transaction = state.extra as BitcoinTransaction;
             return _buildFadeScalePage(
-              child: TransactionDetailsScreen(transaction: transaction),
+              child: BitcoinTransactionDetailsScreen(transaction: transaction),
               state: state,
             );
           },
@@ -173,6 +167,16 @@ class AppRouter {
           },
         ),
         GoRoute(
+          path: '/lightning-conversion-transaction-details',
+          name: 'lightningConversionTransactionDetails',
+          pageBuilder: (context, state) {
+            return _buildFadeScalePage(
+              child: LightningConversionTransactionDetails(),
+              state: state,
+            );
+          },
+        ),
+        GoRoute(
           path: '/seed_words',
           name: 'seed_words',
           pageBuilder: (context, state) => _buildFadeScalePage(
@@ -193,14 +197,6 @@ class AppRouter {
           name: 'open_seed_words_pin',
           pageBuilder: (context, state) => _buildFadeScalePage(
             child: const SeedWordsPin(),
-            state: state,
-          ),
-        ),
-        GoRoute(
-          path: '/accounts',
-          name: 'accounts',
-          pageBuilder: (context, state) => _buildFadeScalePage(
-            child: const Accounts(),
             state: state,
           ),
         ),
@@ -229,10 +225,10 @@ class AppRouter {
           ),
         ),
         GoRoute(
-          path: '/services',
-          name: 'services',
+          path: '/settings',
+          name: 'settings',
           pageBuilder: (context, state) => _buildFadeScalePage(
-            child: const Services(),
+            child: const Settings(),
             state: state,
           ),
         ),
@@ -275,7 +271,7 @@ class AppRouter {
                   case 'non_native_asset':
                     return state.namedLocation('pay_non_native_asset');
                   case 'lightning':
-                    return state.namedLocation('pay_boltz');
+                    return state.namedLocation('pay_spark_bitcoin');
                 }
                 return null;
               },
@@ -297,14 +293,6 @@ class AppRouter {
                   ),
                 ),
                 GoRoute(
-                  path: 'confirm_boltz_payment', // Corrected to relative path
-                  name: 'pay_boltz',
-                  pageBuilder: (context, state) => _buildFadeScalePage(
-                    child: ConfirmBoltzPayment(key: UniqueKey()),
-                    state: state,
-                  ),
-                ),
-                GoRoute(
                   path: 'confirm_liquid_asset_payment', // Added :assetId parameter
                   name: 'pay_liquid_asset',
                   pageBuilder: (context, state) => _buildFadeScalePage(
@@ -316,7 +304,7 @@ class AppRouter {
                   path: 'confirm_spark_bitcoin_payment', // Corrected to relative path
                   name: 'pay_spark_bitcoin',
                   pageBuilder: (context, state) => _buildFadeScalePage(
-                    child: ConfirmSparkBitcoinPayment(key: UniqueKey()),
+                    child: ConfirmLightningPayment(key: UniqueKey()),
                     state: state,
                   ),
                 ),
@@ -345,11 +333,21 @@ class AppRouter {
               ),
               routes: [
                 GoRoute(
-                  path: '/sell_type',
-                  pageBuilder: (context, state) => _buildFadeScalePage(
-                    child: const SellType(),
-                    state: state,
-                  ),
+                    path: '/sell_type',
+                    pageBuilder: (context, state) => _buildFadeScalePage(
+                      child: const SellTypeScreen(),
+                      state: state,
+                    ),
+                    routes: [
+                      GoRoute(
+                        path: '/sell_pix_nox',
+                        name: 'SellPixNox',
+                        pageBuilder: (context, state) => _buildFadeScalePage(
+                          child: const SellPixNox(),
+                          state: state,
+                        ),
+                      ),
+                    ]
                 ),
                 GoRoute(
                   path: 'deposit_type',
@@ -358,22 +356,22 @@ class AppRouter {
                     state: state,
                   ),
                   routes: [
-                      GoRoute(
-                        path: '/deposit_pix_eulen',
-                        name: 'DepositPixEulen',
-                        pageBuilder: (context, state) => _buildFadeScalePage(
-                          child: const DepositDepixPixEulen(),
-                          state: state,
-                        ),
+                    GoRoute(
+                      path: '/deposit_pix_eulen',
+                      name: 'DepositPixEulen',
+                      pageBuilder: (context, state) => _buildFadeScalePage(
+                        child: const DepositDepixPixEulen(),
+                        state: state,
                       ),
-                      GoRoute(
-                        path: '/deposit_pix_nox',
-                        name: 'DepositPixNox',
-                        pageBuilder: (context, state) => _buildFadeScalePage(
-                          child: const DepositPixNox(),
-                          state: state,
-                        ),
+                    ),
+                    GoRoute(
+                      path: '/deposit_pix_nox',
+                      name: 'DepositPixNox',
+                      pageBuilder: (context, state) => _buildFadeScalePage(
+                        child: const DepositPixNox(),
+                        state: state,
                       ),
+                    ),
                   ],
                 ),
               ],
@@ -439,14 +437,6 @@ class AppRouter {
           name: 'nox_transaction_details',
           pageBuilder: (context, state) => _buildFadeScalePage(
             child: const NoxTransactionDetails(),
-            state: state,
-          ),
-        ),
-        GoRoute(
-          path: '/boltz_transaction_details',
-          name: 'boltzTransactionDetails',
-          pageBuilder: (context, state) => _buildFadeScalePage(
-            child: const BoltzTransactionDetailsScreen(),
             state: state,
           ),
         ),

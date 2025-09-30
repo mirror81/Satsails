@@ -4,10 +4,13 @@
 <dict>
 	<key>aps-environment</key>
 	<string>development</string>
-	<key>com.apple.developer.associated-domains</key>
+	<key>com.apple.security.application-groups</key>
 	<array>
-		<string>1zl8l.app.link</string>
-		<string>links.satsails.com</string>
+		<string>group.com.satsailswallet.satsails</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)com.satsailswallet.satsails</string>
 	</array>
 </dict>
 </plist>

@@ -3,13 +3,12 @@ import 'package:Satsails/helpers/bitcoin_formart_converter.dart';
 import 'package:Satsails/helpers/string_extension.dart';
 import 'package:Satsails/models/address_model.dart';
 import 'package:Satsails/providers/address_receive_provider.dart';
-import 'package:Satsails/providers/background_sync_provider.dart';
 import 'package:Satsails/providers/balance_provider.dart';
 import 'package:Satsails/providers/currency_conversions_provider.dart';
 import 'package:Satsails/providers/liquid_provider.dart';
 import 'package:Satsails/screens/shared/message_display.dart';
 import 'package:Satsails/screens/shared/transaction_modal.dart';
-import 'package:Satsails/translations/translations.dart';
+import 'package:Satsails/translations/localizations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_keyboard_visibility/flutter_keyboard_visibility.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -21,8 +20,8 @@ import 'package:Satsails/helpers/input_formatters/decimal_text_input_formatter.d
 import 'package:Satsails/providers/send_tx_provider.dart';
 import 'package:Satsails/providers/settings_provider.dart';
 import 'package:action_slider/action_slider.dart';
-
-
+import 'package:Satsails/providers/navigation_provider.dart';
+import 'package:Satsails/screens/exchange/exchange.dart'; // For SwapSection enum
 Future<bool> showConfirmationModal(BuildContext context, String amount, String address, int fee, String btcFormat, WidgetRef ref) async {
   final settings = ref.read(settingsProvider);
   final currency = settings.currency;
@@ -34,183 +33,136 @@ Future<bool> showConfirmationModal(BuildContext context, String amount, String a
     return '${value.substring(0, 6)}...${value.substring(value.length - 6)}';
   }
 
+  // A local helper for creating styled detail rows
+  Widget buildDetailRow({required String label, required String value}) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 8.h),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.white.withOpacity(0.6), fontSize: 16.sp)),
+          Text(value, style: TextStyle(color: Colors.white, fontSize: 16.sp, fontWeight: FontWeight.w500)),
+        ],
+      ),
+    );
+  }
+
   return await showDialog<bool>(
     context: context,
-    barrierDismissible: false, // Prevents dismissal by tapping outside
+    barrierDismissible: false, // User must explicitly confirm or cancel
     builder: (BuildContext context) {
       return Dialog(
-        backgroundColor: Colors.transparent, // Transparent background around the card
-        child: Center(
-          child: Card(
-            color: const Color(0xFF333333), // Dark background like a dialog
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-            elevation: 8, // Shadow effect
-            child: Padding(
-              padding: EdgeInsets.all(24.w), // Responsive inner padding
-              child: Column(
-                mainAxisSize: MainAxisSize.min, // Compact size
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Title
-                  Center(
-                    child: Text(
-                      'Confirm Transaction'.i18n,
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24.sp, // Responsive font size
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+        backgroundColor: Colors.transparent,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            maxWidth: MediaQuery.of(context).size.width * 0.9,
+          ),
+          child: Container(
+            padding: EdgeInsets.fromLTRB(24.w, 20.h, 24.w, 20.h),
+            decoration: BoxDecoration(
+                color: const Color(0xFF212121),
+                borderRadius: BorderRadius.circular(24.r),
+                border: Border.all(color: Colors.white.withOpacity(0.1), width: 1.5)),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Title
+                Text(
+                  'Confirm Transaction'.i18n,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 22.sp,
+                    fontWeight: FontWeight.bold,
                   ),
-                  SizedBox(height: 24.h), // Responsive height
+                ),
+                SizedBox(height: 24.h),
 
-                  // Amount Section
-                  Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8.h),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Amount'.i18n,
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 20.sp,
-                          ),
-                        ),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              '$amount $btcFormat',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 20.sp,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            Text(
-                              '${currencyFormat(amountInCurrency, currency)} $currency',
-                              style: TextStyle(
-                                color: Colors.grey[400],
-                                fontSize: 18.sp,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
+                // Hero Amount Section
+                Text(
+                  '$amount $btcFormat',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 28.sp,
+                    fontWeight: FontWeight.bold,
                   ),
-
-                  // Divider
-                  Divider(color: Colors.grey[700], height: 20.h),
-
-                  // Recipient Section
-                  Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8.h),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Recipient'.i18n,
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 20.sp,
-                          ),
-                        ),
-                        SizedBox(height: 8.h),
-                        Container(
-                          width: double.infinity,
-                          padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 8.h),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[800],
-                            borderRadius: BorderRadius.circular(6.r),
-                          ),
-                          child: Text(
-                            shortenAddress(address),
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18.sp,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                ),
+                SizedBox(height: 4.h),
+                Text(
+                  '≈ ${currencyFormat(amountInCurrency, currency)} $currency',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 18.sp,
                   ),
+                ),
+                Padding(
+                  padding: EdgeInsets.symmetric(vertical: 16.h),
+                  child: Divider(color: Colors.white.withOpacity(0.15)),
+                ),
 
-                  // Divider
-                  Divider(color: Colors.grey[700], height: 20.h),
+                // Details Section
+                buildDetailRow(
+                  label: 'Recipient'.i18n,
+                  value: shortenAddress(address),
+                ),
+                buildDetailRow(
+                  label: 'Network Fee'.i18n,
+                  value: '$fee sats',
+                ),
+                SizedBox(height: 24.h),
 
-                  // Fee Section
-                  Padding(
-                    padding: EdgeInsets.symmetric(vertical: 8.h),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Fee'.i18n,
-                          style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 20.sp,
-                          ),
+                // Action Buttons
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 12.h),
+                          side: BorderSide(color: Colors.white.withOpacity(0.3)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                         ),
-                        Text(
-                          '$fee sats',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 20.sp,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // Action Buttons
-                  SizedBox(height: 24.h),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    children: [
-                      TextButton(
                         onPressed: () => Navigator.of(context).pop(false),
                         child: Text(
                           'Cancel'.i18n,
                           style: TextStyle(
-                            color: Colors.grey[400],
-                            fontSize: 18.sp,
-                            fontWeight: FontWeight.w600,
+                            color: Colors.white.withOpacity(0.8),
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                      SizedBox(width: 16.w), // Responsive width
-                      ElevatedButton(
+                    ),
+                    SizedBox(width: 16.w),
+                    Expanded(
+                      child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
+                          padding: EdgeInsets.symmetric(vertical: 12.h),
                           backgroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(6.r)),
-                          padding: EdgeInsets.symmetric(horizontal: 24.w, vertical: 8.h),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
                         ),
                         onPressed: () => Navigator.of(context).pop(true),
                         child: Text(
                           'Confirm'.i18n,
                           style: TextStyle(
                             color: Colors.black,
-                            fontSize: 18.sp,
-                            fontWeight: FontWeight.w600,
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),
-                    ],
-                  ),
-                ],
-              ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
         ),
       );
     },
-  ) ?? false; // Default to false if dialog is dismissed without a result
+  ) ??
+      false; // Default to false if dialog is dismissed
 }
 
+// This is the transaction details card from the original file, unchanged.
 Widget buildTransactionDetailsCard(WidgetRef ref) {
   return Card(
     color: const Color(0x00333333).withOpacity(0.4),
@@ -245,11 +197,10 @@ Widget buildTransactionDetailsCard(WidgetRef ref) {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              Text('Amount:'.i18n, style: TextStyle(fontSize: 16.sp, color: Colors.white, fontWeight: FontWeight.bold)),
               Text(
-                  'Amount:'.i18n,
-                  style: TextStyle(fontSize: 16.sp, color: Colors.white, fontWeight: FontWeight.bold)
-              ),
-              Text(currencyFormat(ref.watch(bitcoinValueInCurrencyProvider), ref.watch(settingsProvider).currency), style: TextStyle(fontSize: 16.sp, color: Colors.white),
+                currencyFormat(ref.watch(bitcoinValueInCurrencyProvider), ref.watch(settingsProvider).currency),
+                style: TextStyle(fontSize: 16.sp, color: Colors.white),
               ),
             ],
           ),
@@ -310,9 +261,6 @@ Widget buildTransactionDetailsCard(WidgetRef ref) {
   );
 }
 
-
-
-
 class ConfirmLiquidPayment extends ConsumerStatefulWidget {
   const ConfirmLiquidPayment({super.key});
 
@@ -360,7 +308,7 @@ class _ConfirmLiquidPaymentState extends ConsumerState<ConfirmLiquidPayment> {
     updateControllerText(sendTxState.amount);
     final address = sendTxState.address;
     addressController.text = address;
-    }
+  }
 
   @override
   void dispose() {
@@ -372,9 +320,8 @@ class _ConfirmLiquidPaymentState extends ConsumerState<ConfirmLiquidPayment> {
   @override
   Widget build(BuildContext context) {
     final btcBalanceInFormat = ref.read(liquidBalanceInFormatProvider(btcFormat));
-    final valueInBtc = ref.watch(liquidBalanceInFormatProvider('BTC')) == '0.00000000'
-        ? 0
-        : double.parse(ref.watch(liquidBalanceInFormatProvider('BTC')));
+    final valueInBtc =
+    ref.watch(liquidBalanceInFormatProvider('BTC')) == '0.00000000' ? 0 : double.parse(ref.watch(liquidBalanceInFormatProvider('BTC')));
     final balanceInSelectedCurrency = (valueInBtc * currencyRate).toStringAsFixed(2);
 
     return PopScope(
@@ -507,203 +454,135 @@ class _ConfirmLiquidPaymentState extends ConsumerState<ConfirmLiquidPayment> {
                           Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Padding(
-                                padding: EdgeInsets.only(bottom: 8.h),
-                                child: Text(
-                                  'Amount'.i18n,
-                                  style: TextStyle(
-                                    fontSize: 18.sp,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    'Amount'.i18n,
+                                    style: TextStyle(
+                                      fontSize: 18.sp,
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
-                                ),
+                                  DropdownButtonHideUnderline(
+                                    child: DropdownButton<String>(
+                                      dropdownColor: const Color(0xFF212121),
+                                      value: ref.watch(inputCurrencyProvider),
+                                      items: ['BTC', 'USD', 'GBP', 'CHF', 'EUR', 'BRL', 'Sats']
+                                          .map((String value) => DropdownMenuItem<String>(
+                                        value: value,
+                                        child: Text(
+                                          value,
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 16.sp,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ))
+                                          .toList(),
+                                      onChanged: (value) {
+                                        if (value != null) {
+                                          ref.read(inputCurrencyProvider.notifier).state = value;
+                                          controller.text = '';
+                                          ref.read(sendTxProvider.notifier).updateAmountFromInput('0', 'sats');
+                                          ref.read(sendTxProvider.notifier).updateDrain(false);
+                                        }
+                                      },
+                                      icon: Icon(Icons.arrow_drop_down, color: Colors.white, size: 24.sp),
+                                      borderRadius: const BorderRadius.all(Radius.circular(12.0)),
+                                    ),
+                                  ),
+                                ],
                               ),
+                              SizedBox(height: 8.h),
                               Container(
                                 decoration: BoxDecoration(
                                   color: const Color(0x00333333).withOpacity(0.4),
                                   borderRadius: BorderRadius.circular(12.r),
                                 ),
-                                child: Padding(
-                                  padding: EdgeInsets.symmetric(vertical: 8.h),
-                                  child: Row(
-                                    children: [
-                                      // Input Field
-                                      Expanded(
-                                        child: TextFormField(
-                                          controller: controller,
-                                          keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                                          inputFormatters: ref.watch(inputCurrencyProvider) == 'Sats'
-                                              ? [DecimalTextInputFormatter(decimalRange: 0)]
-                                              : [CommaTextInputFormatter(), DecimalTextInputFormatter(decimalRange: 8)],
-                                          style: TextStyle(fontSize: 24.sp, color: Colors.white),
-                                          textAlign: TextAlign.left,
-                                          decoration: InputDecoration(
-                                            border: InputBorder.none,
-                                            hintText: '0',
-                                            hintStyle: const TextStyle(color: Colors.white70),
-                                            contentPadding: EdgeInsets.symmetric(horizontal: 16.w),
-                                          ),
-                                          onChanged: (value) async {
-                                              ref.read(inputAmountProvider.notifier).state =
-                                              controller.text.isEmpty ? '0.0' : controller.text;
-                                              if (value.isEmpty) {
-                                                ref.read(sendTxProvider.notifier).updateAmountFromInput('0', btcFormat);
-                                                ref.read(sendTxProvider.notifier).updateDrain(false);
-                                              }
-                                              final amountInSats = calculateAmountInSatsToDisplay(
-                                                value,
-                                                ref.watch(inputCurrencyProvider),
-                                                ref.watch(currencyNotifierProvider),
+                                child: TextFormField(
+                                  controller: controller,
+                                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                                  inputFormatters: ref.watch(inputCurrencyProvider) == 'Sats'
+                                      ? [DecimalTextInputFormatter(decimalRange: 0)]
+                                      : ref.watch(inputCurrencyProvider) == 'BTC'
+                                      ? [CommaTextInputFormatter(), DecimalTextInputFormatter(decimalRange: 8)]
+                                      : [CommaTextInputFormatter(), DecimalTextInputFormatter(decimalRange: 2)],
+                                  style: TextStyle(fontSize: 24.sp, color: Colors.white),
+                                  textAlign: TextAlign.left,
+                                  decoration: InputDecoration(
+                                    border: InputBorder.none,
+                                    hintText: '0',
+                                    hintStyle: const TextStyle(color: Colors.white70),
+                                    contentPadding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 16.h),
+                                    suffixIcon: Align(
+                                      widthFactor: 1.0,
+                                      heightFactor: 1.0,
+                                      child: Padding(
+                                        padding: EdgeInsets.only(right: 12.w),
+                                        child: GestureDetector(
+                                          onTap: () async {
+                                            try {
+                                              final pset = await ref.watch(liquidDrainWalletProvider.future);
+                                              final sendingBalance = pset.balances[0].value + pset.absoluteFees.toInt();
+                                              final controllerValue = sendingBalance.abs();
+                                              final selectedCurrency = ref.watch(inputCurrencyProvider);
+                                              final amountToSetInSelectedCurrency = calculateAmountInSelectedCurrency(
+                                                  controllerValue, selectedCurrency, ref.watch(currencyNotifierProvider));
+                                              controller.text = selectedCurrency == 'BTC'
+                                                  ? amountToSetInSelectedCurrency
+                                                  : selectedCurrency == 'Sats'
+                                                  ? double.parse(amountToSetInSelectedCurrency).toStringAsFixed(0)
+                                                  : double.parse(amountToSetInSelectedCurrency).toStringAsFixed(2);
+                                              ref
+                                                  .read(sendTxProvider.notifier)
+                                                  .updateAmountFromInput(controllerValue.toString(), 'sats');
+                                              ref.read(sendTxProvider.notifier).updateDrain(true);
+                                            } catch (e) {
+                                              showMessageSnackBar(
+                                                message: e.toString().i18n,
+                                                error: true,
+                                                context: context,
                                               );
-                                              ref.read(sendTxProvider.notifier).updateAmountFromInput(amountInSats.toString(), 'sats');
-                                              ref.read(sendTxProvider.notifier).updateDrain(false);
+                                            }
                                           },
-                                        ),
-                                      ),
-                                      Row(
-                                        children: [
-                                          SizedBox(
-                                            width: 80.w, // Updated from 100.w to match AmountInput
-                                            child: Column(
-                                              mainAxisSize: MainAxisSize.min,
-                                              children: [
-                                                DropdownButtonHideUnderline(
-                                                  child: DropdownButton<String>(
-                                                    dropdownColor: const Color(0xFF212121), // Updated background color
-                                                    value: ref.watch(inputCurrencyProvider),
-                                                    items: [
-                                                      DropdownMenuItem(
-                                                        value: 'BTC',
-                                                        child: Padding(
-                                                          padding: EdgeInsets.only(left: 16.w), // Added padding
-                                                          child: Text(
-                                                            'BTC',
-                                                            style: TextStyle(
-                                                              color: Colors.white, // White text
-                                                              fontSize: 16.sp,
-                                                              fontWeight: FontWeight.bold, // Bold text
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      DropdownMenuItem(
-                                                        value: 'USD',
-                                                        child: Padding(
-                                                          padding: EdgeInsets.only(left: 16.w),
-                                                          child: Text(
-                                                            'USD',
-                                                            style: TextStyle(
-                                                              color: Colors.white,
-                                                              fontSize: 16.sp,
-                                                              fontWeight: FontWeight.bold,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      DropdownMenuItem(
-                                                        value: 'EUR',
-                                                        child: Padding(
-                                                          padding: EdgeInsets.only(left: 16.w),
-                                                          child: Text(
-                                                            'EUR',
-                                                            style: TextStyle(
-                                                              color: Colors.white,
-                                                              fontSize: 16.sp,
-                                                              fontWeight: FontWeight.bold,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      DropdownMenuItem(
-                                                        value: 'BRL',
-                                                        child: Padding(
-                                                          padding: EdgeInsets.only(left: 16.w),
-                                                          child: Text(
-                                                            'BRL',
-                                                            style: TextStyle(
-                                                              color: Colors.white,
-                                                              fontSize: 16.sp,
-                                                              fontWeight: FontWeight.bold,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                      DropdownMenuItem(
-                                                        value: 'Sats',
-                                                        child: Padding(
-                                                          padding: EdgeInsets.only(left: 16.w),
-                                                          child: Text(
-                                                            'Sats',
-                                                            style: TextStyle(
-                                                              color: Colors.white,
-                                                              fontSize: 16.sp,
-                                                              fontWeight: FontWeight.bold,
-                                                            ),
-                                                          ),
-                                                        ),
-                                                      ),
-                                                    ],
-                                                    onChanged: (value) {
-                                                      ref.read(inputCurrencyProvider.notifier).state = value.toString();
-                                                      controller.text = '';
-                                                      ref.read(sendTxProvider.notifier).updateAmountFromInput('0', 'sats');
-                                                      ref.read(sendTxProvider.notifier).updateDrain(false);
-                                                    },
-                                                    icon: Icon(Icons.arrow_drop_down, color: Colors.white, size: 24.sp), // Added custom icon
-                                                    borderRadius: const BorderRadius.all(Radius.circular(12.0)), // Added border radius
-                                                  ),
-                                                ),
-                                              ],
+                                          child: Container(
+                                            padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.circular(8.r),
                                             ),
-                                          ),
-                                          Padding(
-                                            padding: EdgeInsets.only(right: 8.sp),
-                                            child: GestureDetector(
-                                              onTap: () async {
-                                                try {
-                                                    final pset = await ref.watch(liquidDrainWalletProvider.future);
-                                                    final sendingBalance = pset.balances[0].value + pset.absoluteFees.toInt();
-                                                    final controllerValue = sendingBalance.abs();
-                                                    final selectedCurrency = ref.watch(inputCurrencyProvider);
-                                                    final amountToSetInSelectedCurrency = calculateAmountInSelectedCurrency(
-                                                        controllerValue, selectedCurrency, ref.watch(currencyNotifierProvider));
-                                                    controller.text = selectedCurrency == 'BTC'
-                                                        ? amountToSetInSelectedCurrency
-                                                        : selectedCurrency == 'Sats'
-                                                        ? double.parse(amountToSetInSelectedCurrency).toStringAsFixed(0)
-                                                        : double.parse(amountToSetInSelectedCurrency).toStringAsFixed(2);
-                                                    ref.read(sendTxProvider.notifier).updateAmountFromInput(
-                                                        controllerValue.toString(), 'sats');
-                                                    ref.read(sendTxProvider.notifier).updateDrain(true);
-                                                } catch (e) {
-                                                  showMessageSnackBar(
-                                                    message: e.toString().i18n,
-                                                    error: true,
-                                                    context: context,
-                                                  );
-                                                }
-                                              },
-                                              child: Container(
-                                                padding: EdgeInsets.symmetric(horizontal: 16.w, vertical: 8.h),
-                                                decoration: BoxDecoration(
-                                                  color: Colors.white,
-                                                  borderRadius: BorderRadius.circular(8.r),
-                                                ),
-                                                child: Text(
-                                                  'Max',
-                                                  style: TextStyle(
-                                                    color: Colors.black,
-                                                    fontSize: 16.sp,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
+                                            child: Text(
+                                              'Max',
+                                              style: TextStyle(
+                                                color: Colors.black,
+                                                fontSize: 16.sp,
+                                                fontWeight: FontWeight.bold,
                                               ),
                                             ),
                                           ),
-                                        ],
+                                        ),
                                       ),
-                                    ],
+                                    ),
                                   ),
+                                  onChanged: (value) async {
+                                    ref.read(inputAmountProvider.notifier).state =
+                                    controller.text.isEmpty ? '0.0' : controller.text;
+                                    if (value.isEmpty) {
+                                      ref.read(sendTxProvider.notifier).updateAmountFromInput('0', btcFormat);
+                                      ref.read(sendTxProvider.notifier).updateDrain(false);
+                                    }
+                                    final amountInSats = calculateAmountInSatsToDisplay(
+                                      value,
+                                      ref.watch(inputCurrencyProvider),
+                                      ref.watch(currencyNotifierProvider),
+                                    );
+                                    ref.read(sendTxProvider.notifier).updateAmountFromInput(amountInSats.toString(), 'sats');
+                                    ref.read(sendTxProvider.notifier).updateDrain(false);
+                                  },
                                 ),
                               ),
                             ],
@@ -718,7 +597,27 @@ class _ConfirmLiquidPaymentState extends ConsumerState<ConfirmLiquidPayment> {
                     sliderBehavior: SliderBehavior.stretch,
                     width: double.infinity,
                     backgroundColor: Colors.black,
-                    toggleColor: Colors.orange,
+                    toggleColor: const Color(0x00333333).withOpacity(0.4),
+                    icon: const Icon(
+                      Icons.keyboard_arrow_right_rounded,
+                      color: Colors.orange, // Orange arrow icon
+                    ),
+                    loadingIcon: const SizedBox(
+                      width: 24.0,
+                      height: 24.0,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.0,
+                        color: Colors.orange, // Orange loading spinner
+                      ),
+                    ),
+                    successIcon: const Icon(
+                      Icons.check_rounded,
+                      color: Colors.orange, // Orange success icon
+                    ),
+                    failureIcon: const Icon(
+                      Icons.close_rounded,
+                      color: Colors.orange, // Orange failure icon
+                    ),
                     action: (controller) async {
                       setState(() {
                         isProcessing = true;
@@ -731,17 +630,10 @@ class _ConfirmLiquidPaymentState extends ConsumerState<ConfirmLiquidPayment> {
                         final fee = await ref.read(liquidFeeProvider.future);
 
                         // Show confirmation modal
-                        final confirmed = await showConfirmationModal(
-                          context,
-                          btcInDenominationFormatted(sendTxState.amount, btcFormat),
-                          sendTxState.address ?? '',
-                          fee,
-                          btcFormat,
-                          ref
-                        );
+                        final confirmed = await showConfirmationModal(context,
+                            btcInDenominationFormatted(sendTxState.amount, btcFormat), sendTxState.address ?? '', fee, btcFormat, ref);
 
                         if (confirmed) {
-                          // Proceed with transaction only if user confirms
                           final tx = await ref.watch(sendLiquidTransactionProvider.future);
 
                           showFullscreenTransactionSendModal(

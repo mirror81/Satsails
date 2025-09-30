@@ -182,26 +182,20 @@ class UserService {
     }
   }
 
-  static Future<Result<bool>> addCashbackAddressCode(String cashbackAddress, String auth) async {
+  static Future<Result<double>> eulenFeeAmount(String auth) async {
     try {
       // final appCheckToken = await FirebaseAppCheck.instance.getToken();
 
-      final response = await http.post(
-        Uri.parse('${dotenv.env['BACKEND']!}/users/add_cashback_address'),
-        body: jsonEncode({
-          'user': {
-            'liquid_address': cashbackAddress,
-          }
-        }),
+      final response = await http.get(
+        Uri.parse('${dotenv.env['BACKEND']!}/users/eulen_fee_amount'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': auth,
-          // 'X-Firebase-AppCheck': appCheckToken ?? '',
         },
       );
 
       if (response.statusCode == 200) {
-        return Result(data: true);
+        return  Result(data: jsonDecode(response.body)['fee']);
       } else {
         String errorMsg = jsonDecode(response.body)['error'] ?? 'Failed to add affiliate code';
         return Result(error: errorMsg);

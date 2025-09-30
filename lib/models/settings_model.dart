@@ -1,24 +1,31 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive/hive.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SettingsModel extends StateNotifier<Settings> {
   SettingsModel(super.state);
 
+  final _secureStorage = const FlutterSecureStorage();
+
+  IOSOptions _getIOSOptions() => const IOSOptions(
+    accessibility: KeychainAccessibility.first_unlock,
+  );
+
   Future<void> setCurrency(String newCurrency) async {
     final box = await Hive.openBox('settings');
-    box.put('currency', newCurrency);
+    await box.put('currency', newCurrency);
     state = state.copyWith(currency: newCurrency);
   }
 
   Future<void> setLanguage(String newLanguage) async {
     final box = await Hive.openBox('settings');
-    box.put('language', newLanguage);
+    await box.put('language', newLanguage);
     state = state.copyWith(language: newLanguage);
   }
 
   Future<void> setBtcFormat(String newBtcFormat) async {
     final box = await Hive.openBox('settings');
-    box.put('btcFormat', newBtcFormat);
+    await box.put('btcFormat', newBtcFormat);
     state = state.copyWith(btcFormat: newBtcFormat);
   }
 
@@ -28,39 +35,47 @@ class SettingsModel extends StateNotifier<Settings> {
 
   Future<void> setBackup(bool backupStatus) async {
     final box = await Hive.openBox('settings');
-    box.put('backup', backupStatus);
+    await box.put('backup', backupStatus);
     state = state.copyWith(backup: backupStatus);
   }
 
-  // New method to handle the biometrics setting
   Future<void> setBiometricsEnabled(bool enabled) async {
     final box = await Hive.openBox('settings');
-    box.put('biometricsEnabled', enabled);
+    await box.put('biometricsEnabled', enabled);
     state = state.copyWith(biometricsEnabled: enabled);
   }
 
   Future<void> setBitcoinElectrumNode(String newElectrumNode) async {
     final box = await Hive.openBox('settings');
-    box.put('bitcoinElectrumNode', newElectrumNode);
+    await box.put('bitcoinElectrumNode', newElectrumNode);
     state = state.copyWith(bitcoinElectrumNode: newElectrumNode);
   }
 
   Future<void> setLiquidElectrumNode(String newElectrumNode) async {
     final box = await Hive.openBox('settings');
-    box.put('liquidElectrumNode', newElectrumNode);
+    await box.put('liquidElectrumNode', newElectrumNode);
     state = state.copyWith(liquidElectrumNode: newElectrumNode);
   }
 
   Future<void> setNodeType(String newNodeType) async {
     final box = await Hive.openBox('settings');
-    box.put('nodeType', newNodeType);
+    await box.put('nodeType', newNodeType);
     state = state.copyWith(nodeType: newNodeType);
   }
 
   Future<void> setBalanceVisible(bool balanceVisible) async {
     final box = await Hive.openBox('settings');
-    box.put('balanceVisible', balanceVisible);
+    await box.put('balanceVisible', balanceVisible);
     state = state.copyWith(balanceVisible: balanceVisible);
+  }
+
+  Future<void> setReviewDone(bool hasBeenReviewed) async {
+    await _secureStorage.write(
+      key: 'reviewDone',
+      value: hasBeenReviewed.toString(),
+      iOptions: _getIOSOptions(),
+    );
+    state = state.copyWith(reviewDone: hasBeenReviewed);
   }
 }
 
@@ -71,11 +86,11 @@ class Settings {
   late bool online;
   final bool balanceVisible;
   final bool backup;
-  final bool biometricsEnabled; // New property
+  final bool biometricsEnabled;
   final String bitcoinElectrumNode;
   final String liquidElectrumNode;
   final String nodeType;
-
+  final bool reviewDone;
 
   Settings({
     required this.currency,
@@ -84,11 +99,14 @@ class Settings {
     required this.online,
     required this.backup,
     required this.balanceVisible,
-    required this.biometricsEnabled, // Add to constructor
+    required this.biometricsEnabled,
     required this.bitcoinElectrumNode,
     required this.liquidElectrumNode,
     required this.nodeType,
-  }) : btcFormat = (['BTC', 'mBTC', 'bits', 'sats'].contains(btcFormat)) ? btcFormat : throw ArgumentError('Invalid btcFormat'),
+    required this.reviewDone,
+  }) : btcFormat = (['BTC', 'mBTC', 'bits', 'sats'].contains(btcFormat))
+      ? btcFormat
+      : throw ArgumentError('Invalid btcFormat'),
         super();
 
   Settings copyWith({
@@ -98,11 +116,12 @@ class Settings {
     bool? online,
     bool? balanceVisible,
     bool? backup,
-    bool? biometricsEnabled, // Add to copyWith
+    bool? biometricsEnabled,
     String? pixPaymentCode,
     String? bitcoinElectrumNode,
     String? liquidElectrumNode,
     String? nodeType,
+    bool? reviewDone,
   }) {
     return Settings(
       currency: currency ?? this.currency,
@@ -111,10 +130,11 @@ class Settings {
       balanceVisible: balanceVisible ?? this.balanceVisible,
       online: online ?? this.online,
       backup: backup ?? this.backup,
-      biometricsEnabled: biometricsEnabled ?? this.biometricsEnabled, // Add to copyWith logic
+      biometricsEnabled: biometricsEnabled ?? this.biometricsEnabled,
       bitcoinElectrumNode: bitcoinElectrumNode ?? this.bitcoinElectrumNode,
       liquidElectrumNode: liquidElectrumNode ?? this.liquidElectrumNode,
       nodeType: nodeType ?? this.nodeType,
+      reviewDone: reviewDone ?? this.reviewDone,
     );
   }
 }

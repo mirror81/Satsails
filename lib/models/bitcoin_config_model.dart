@@ -78,6 +78,39 @@ class BitcoinConfigModel {
     );
     return wallet;
   }
+
+  /// Extracts raw xpub from external descriptor for watch-only wallet import
+  /// Returns xpub/zpub/tpub depending on network and format
+  Future<String> extractBitcoinXpub() async {
+    try {
+      final externalDescriptor = await createExternalDescriptor();
+      final descriptorString = externalDescriptor.asString();
+
+      // Parse descriptor to extract xpub
+      // Expected format: "wpkh([fingerprint/84'/0'/0']xpub.../0/*)"
+      // Or: "wpkh(xpub.../0/*)"
+
+      // Try format with fingerprint first
+      final fingerprintPattern = RegExp(r'\]([xztvXZTV][a-zA-Z0-9]+)');
+      var match = fingerprintPattern.firstMatch(descriptorString);
+
+      // If no match, try format without fingerprint
+      if (match == null) {
+        final simplePattern = RegExp(r'\(([xztvXZTV][a-zA-Z0-9]+)');
+        match = simplePattern.firstMatch(descriptorString);
+      }
+
+      if (match == null) {
+        throw Exception('Could not extract xpub from descriptor');
+      }
+
+      // Extract key and remove any path suffix
+      final key = match.group(1)!.split('/')[0];
+      return key;
+    } catch (e) {
+      throw Exception('Failed to extract Bitcoin xpub: $e');
+    }
+  }
 }
 
 class BitcoinConfig {

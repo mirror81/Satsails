@@ -90,8 +90,10 @@ class Settings extends ConsumerWidget {
                 children: [
                   _buildChatWithSupportSection(context, ref),
                   _buildRateAppSection(context, ref),
+                  _buildOtcSection(context, ref),
                   _buildAffiliateSection(context, ref),
                   _buildSeedSection(context, ref),
+                  _buildExportXpubSection(context, ref),
                   biometricsAvailable.when(
                     data: (isAvailable) => isAvailable
                         ? _buildBiometricsSection(context, ref)
@@ -207,6 +209,22 @@ class Settings extends ConsumerWidget {
     );
   }
 
+  Widget _buildOtcSection(BuildContext context, WidgetRef ref) {
+    return _buildSection(
+      context: context,
+      ref: ref,
+      title: 'OTC Trading'.i18n,
+      icon: Icons.compare_arrows,
+      subtitle: Text(
+        'Register for Over-the-Counter trading'.i18n,
+        style: TextStyle(color: Colors.grey, fontSize: 14.sp),
+      ),
+      onTap: () {
+        context.push('/otc_selection');
+      },
+    );
+  }
+
   Widget _buildBlockExplorerSection(BuildContext context, WidgetRef ref) {
     return _buildSection(
       context: context,
@@ -239,6 +257,22 @@ class Settings extends ConsumerWidget {
         walletBackedUp
             ? context.push('/open_seed_words_pin')
             : context.push('/seed_words');
+      },
+    );
+  }
+
+  Widget _buildExportXpubSection(BuildContext context, WidgetRef ref) {
+    return _buildSection(
+      context: context,
+      ref: ref,
+      title: 'Export Xpub'.i18n,
+      icon: Icons.qr_code_2,
+      subtitle: Text(
+        'Export extended public key for watch-only wallet'.i18n,
+        style: TextStyle(color: Colors.grey, fontSize: 14.sp),
+      ),
+      onTap: () {
+        context.push('/open_export_xpub_pin');
       },
     );
   }

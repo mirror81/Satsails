@@ -76,6 +76,7 @@ dependencies:
   upgrader: ^11.4.0
   app_settings: ^6.1.1
   flutter_keyboard_visibility: ^6.0.0
+  url_launcher: ^6.3.1
 
   # Data & Formatting
   decimal: ^3.2.4

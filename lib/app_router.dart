@@ -27,6 +27,9 @@ import 'package:Satsails/screens/home/main_screen.dart';
 import 'package:Satsails/screens/creation/start.dart';
 import 'package:Satsails/screens/pay/components/confirm_liquid_payment.dart';
 import 'package:Satsails/screens/settings/components/seed_words.dart';
+import 'package:Satsails/screens/settings/components/export_xpub.dart';
+import 'package:Satsails/screens/settings/components/otc_selection.dart';
+import 'package:Satsails/screens/login/export_xpub_pin.dart';
 import 'package:Satsails/screens/settings/settings.dart';
 import 'package:Satsails/screens/receive/receive.dart';
 import 'package:Satsails/screens/creation/set_pin.dart';
@@ -197,6 +200,30 @@ class AppRouter {
           name: 'open_seed_words_pin',
           pageBuilder: (context, state) => _buildFadeScalePage(
             child: const SeedWordsPin(),
+            state: state,
+          ),
+        ),
+        GoRoute(
+          path: '/export_xpub',
+          name: 'export_xpub',
+          pageBuilder: (context, state) => _buildFadeScalePage(
+            child: const ExportXpub(),
+            state: state,
+          ),
+        ),
+        GoRoute(
+          path: '/open_export_xpub_pin',
+          name: 'open_export_xpub_pin',
+          pageBuilder: (context, state) => _buildFadeScalePage(
+            child: const ExportXpubPin(),
+            state: state,
+          ),
+        ),
+        GoRoute(
+          path: '/otc_selection',
+          name: 'otc_selection',
+          pageBuilder: (context, state) => _buildFadeScalePage(
+            child: const OtcSelection(),
             state: state,
           ),
         ),

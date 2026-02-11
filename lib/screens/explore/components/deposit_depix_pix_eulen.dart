@@ -44,7 +44,6 @@ class _DepositPixState extends ConsumerState<DepositDepixPixEulen>
   double feePercentage = 0;
   String amountPurchasedToday = '0';
 
-  double? _userFeePercentage;
 
   late final AnimationController _successAnimationController;
   late final Animation<double> _successScaleAnimation;
@@ -70,10 +69,7 @@ class _DepositPixState extends ConsumerState<DepositDepixPixEulen>
   }
 
   Future<void> _fetchInitialData() async {
-    await Future.wait([
-      _fetchAmountPurchasedToday(),
-      _fetchUserFee(),
-    ]);
+    await _fetchAmountPurchasedToday();
   }
 
   Future<void> _fetchAmountPurchasedToday() async {
@@ -85,18 +81,6 @@ class _DepositPixState extends ConsumerState<DepositDepixPixEulen>
     }
   }
 
-  Future<void> _fetchUserFee() async {
-    try {
-      final fee = await ref.read(getUserEulenFeeAmount.future);
-      if (mounted) {
-        setState(() {
-          _userFeePercentage = fee;
-        });
-      }
-    } catch (e) {
-      print("Could not fetch user fee: $e");
-    }
-  }
 
   void _startPolling(String transactionId) {
     _pollingTimer?.cancel();
@@ -166,7 +150,12 @@ class _DepositPixState extends ConsumerState<DepositDepixPixEulen>
           _pixQRCode = purchase.pixKey;
           _isLoading = false;
           _amountToReceive = purchase.receivedAmount;
-          feePercentage = (_userFeePercentage ?? 0.0) * 100;
+          // Calculate fee from actual transaction amounts to avoid race condition
+          // with the separate fee endpoint
+          const fixedEulenFee = 0.99;
+          if (purchase.originalAmount > 0) {
+            feePercentage = ((purchase.originalAmount - purchase.receivedAmount - fixedEulenFee) / purchase.originalAmount) * 100;
+          }
           _transactionId = purchase.transactionId;
         });
         _startPolling(_transactionId!);

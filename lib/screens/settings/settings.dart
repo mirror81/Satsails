@@ -426,7 +426,7 @@ class Settings extends ConsumerWidget {
         style: TextStyle(color: Colors.grey, fontSize: 14.sp),
       ),
       onTap: hasAffiliateCode
-          ? null
+          ? () => context.push('/affiliate_benefits')
           : () {
         _showInsertAffiliateModal(context, ref);
       },

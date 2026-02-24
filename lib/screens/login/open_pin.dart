@@ -7,6 +7,7 @@ import 'package:Satsails/providers/bitcoin_config_provider.dart';
 import 'package:Satsails/providers/liquid_config_provider.dart';
 import 'package:Satsails/providers/send_tx_provider.dart';
 import 'package:Satsails/providers/settings_provider.dart';
+import 'package:Satsails/providers/user_provider.dart';
 import 'package:Satsails/restart_widget.dart';
 import 'package:Satsails/screens/shared/custom_alert_dialog.dart';
 import 'package:Satsails/screens/shared/custom_button.dart';
@@ -120,14 +121,24 @@ class _OpenPinState extends ConsumerState<OpenPin>
     }
   }
 
-  void _unlockApp(BuildContext context, WidgetRef ref) {
+  void _unlockApp(BuildContext context, WidgetRef ref) async {
     _attempts = 0;
 
     ref.read(sendTxProvider.notifier).resetToDefault();
     ref.read(sendBlocksProvider.notifier).state = 1;
     ref.read(addressProvider); // Trigger data loading
 
-    context.go('/home');
+    // Re-authenticate with backend to get fresh JWT (also handles old users without paymentId)
+    try {
+      ref.invalidate(createUserProvider);
+      await ref.read(createUserProvider.future);
+    } catch (e) {
+      debugPrint('Re-auth on unlock failed: $e');
+    }
+
+    if (mounted) {
+      context.go('/home');
+    }
   }
 
   Future<void> _forgotPin(BuildContext context, WidgetRef ref) async {

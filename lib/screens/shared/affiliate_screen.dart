@@ -57,7 +57,15 @@ class _AffiliateViewState extends ConsumerState<_AffiliateView> {
     try {
       if (enteredCode.isNotEmpty) {
         final upperCaseCode = enteredCode.toUpperCase();
-        await ref.read(userProvider.notifier).setAffiliateCode(upperCaseCode);
+        final user = ref.read(userProvider);
+
+        if (user.paymentId.isNotEmpty) {
+          // User already created on backend — send affiliate code to backend
+          await ref.read(addAffiliateCodeProvider(upperCaseCode).future);
+        } else {
+          // User not yet created — save locally, will be sent on next init
+          await ref.read(userProvider.notifier).setAffiliateCode(upperCaseCode);
+        }
 
         if (mounted) {
           showMessageSnackBar(
@@ -67,8 +75,6 @@ class _AffiliateViewState extends ConsumerState<_AffiliateView> {
               top: true);
         }
       }
-
-      ref.invalidate(initializeUserProvider);
 
       if (mounted) {
         context.go('/home');

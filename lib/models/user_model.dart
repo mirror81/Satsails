@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:Satsails/handlers/response_handlers.dart';
+import 'package:Satsails/helpers/http_helper.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive/hive.dart';
@@ -12,13 +13,13 @@ class UserModel extends StateNotifier<User> {
   UserModel(super.state);
   Future<void> setPaymentId(String paymentCode) async {
     final box = await Hive.openBox('user');
-    box.put('paymentId', paymentCode);
+    await box.put('paymentId', paymentCode);
     state = state.copyWith(paymentId: paymentCode);
   }
 
   Future<void> setAffiliateCode(String affiliateCode) async {
     final box = await Hive.openBox('user');
-    box.put('affiliateCode', affiliateCode);
+    await box.put('affiliateCode', affiliateCode);
     state = state.copyWith(affiliateCode: affiliateCode);
   }
 
@@ -35,13 +36,13 @@ class UserModel extends StateNotifier<User> {
 
   Future<void> setHasUploadedAffiliateCode(bool hasUploadedAffiliateCode) async {
     final box = await Hive.openBox('user');
-    box.put('hasUploadedAffiliateCode', hasUploadedAffiliateCode);
+    await box.put('hasUploadedAffiliateCode', hasUploadedAffiliateCode);
     state = state.copyWith(hasUploadedAffiliateCode: hasUploadedAffiliateCode);
   }
 
   Future<void> setHasUploadedLiquidAddress(bool hasUploadedLiquidAddress) async {
     final box = await Hive.openBox('user');
-    box.put('hasUploadedLiquidAddress', hasUploadedLiquidAddress);
+    await box.put('hasUploadedLiquidAddress', hasUploadedLiquidAddress);
     state = state.copyWith(hasUploadedLiquidAddress: hasUploadedLiquidAddress);
   }
 }
@@ -92,10 +93,14 @@ class User {
 
 class UserService {
   /// Create a new user.
-  static Future<Result<User>> createUserRequest(String challenge, String signature) async {
+  static Future<Result<User>> createUserRequest(String challenge, String signature, {String? existingJwt}) async {
     try {
-      // Get the Firebase App Check token.
-      // final appCheckToken = await FirebaseAppCheck.instance.getToken();
+      final headers = await HttpHelper.headers();
+      if (existingJwt != null && existingJwt.isNotEmpty) {
+        headers['Authorization'] = existingJwt;
+      }
+      final deviceId = await HttpHelper.deviceId;
+      final appVersion = await HttpHelper.appVersion;
 
       final response = await http.post(
         Uri.parse('${dotenv.env['BACKEND']!}/users'),
@@ -103,12 +108,11 @@ class UserService {
           'user': {
             'challenge': challenge,
             'signature': signature,
+            if (deviceId != null) 'device_id': deviceId,
+            if (appVersion != null) 'app_version': appVersion,
           }
         }),
-        headers: {
-          'Content-Type': 'application/json',
-          // 'X-Firebase-AppCheck': appCheckToken ?? '',
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 201) {
@@ -124,8 +128,8 @@ class UserService {
   /// Migrate to JWT (authenticate and receive a JWT token).
   static Future<Result<String>> migrateToJWT(String auth, String challenge, String signature) async {
     try {
-      // Get the Firebase App Check token.
-      // final appCheckToken = await FirebaseAppCheck.instance.getToken();
+      final headers = await HttpHelper.headers();
+      headers['Authorization'] = auth;
 
       final response = await http.post(
         Uri.parse('${dotenv.env['BACKEND']!}/users/migrate'),
@@ -135,11 +139,7 @@ class UserService {
             'signature': signature,
           }
         }),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': auth,
-          // 'X-Firebase-AppCheck': appCheckToken ?? '',
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -155,7 +155,7 @@ class UserService {
   /// Add an affiliate code to the user.
   static Future<Result<bool>> addAffiliateCode(String affiliateCode, String auth) async {
     try {
-      // final appCheckToken = await FirebaseAppCheck.instance.getToken();
+      final headers = await HttpHelper.authHeaders(auth);
 
       final response = await http.post(
         Uri.parse('${dotenv.env['BACKEND']!}/users/add_affiliate'),
@@ -164,11 +164,7 @@ class UserService {
             'affiliate_code': affiliateCode,
           }
         }),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': auth,
-          // 'X-Firebase-AppCheck': appCheckToken ?? '',
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -184,20 +180,65 @@ class UserService {
 
   static Future<Result<double>> eulenFeeAmount(String auth) async {
     try {
-      // final appCheckToken = await FirebaseAppCheck.instance.getToken();
+      final headers = await HttpHelper.authHeaders(auth);
 
       final response = await http.get(
         Uri.parse('${dotenv.env['BACKEND']!}/users/eulen_fee_amount'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': auth,
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
         return  Result(data: jsonDecode(response.body)['fee']);
       } else {
         String errorMsg = jsonDecode(response.body)['error'] ?? 'Failed to add affiliate code';
+        return Result(error: errorMsg);
+      }
+    } catch (e) {
+      return Result(error: 'An error has occurred. Please try again later');
+    }
+  }
+
+  static Future<Result<bool>> setCustomerType(String auth, String customerType, {Map<String, String>? merchantDetails}) async {
+    try {
+      final headers = await HttpHelper.authHeaders(auth);
+
+      final body = <String, dynamic>{
+        'customer_type': customerType,
+      };
+      if (merchantDetails != null) {
+        body['merchant_details'] = merchantDetails;
+      }
+
+      final response = await http.post(
+        Uri.parse('${dotenv.env['BACKEND']!}/users/set_customer_type'),
+        body: jsonEncode(body),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return Result(data: true);
+      } else {
+        String errorMsg = jsonDecode(response.body)['error'] ?? 'Failed to set customer type';
+        return Result(error: errorMsg);
+      }
+    } catch (e) {
+      return Result(error: 'An error has occurred. Please try again later');
+    }
+  }
+
+  static Future<Result<double>> noxFeeAmount(String auth) async {
+    try {
+      final headers = await HttpHelper.authHeaders(auth);
+
+      final response = await http.get(
+        Uri.parse('${dotenv.env['BACKEND']!}/users/nox_fee_amount'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        return Result(data: jsonDecode(response.body)['fee']);
+      } else {
+        String errorMsg = jsonDecode(response.body)['error'] ?? 'Failed to get NOX fee';
         return Result(error: errorMsg);
       }
     } catch (e) {

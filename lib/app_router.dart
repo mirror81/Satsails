@@ -11,6 +11,8 @@ import 'package:Satsails/screens/explore/components/deposit_type.dart';
 import 'package:Satsails/screens/explore/components/sell_type.dart';
 import 'package:Satsails/screens/explore/explore.dart';
 import 'package:Satsails/screens/creation/confirm_pin.dart';
+import 'package:Satsails/screens/creation/customer_type_selection.dart';
+import 'package:Satsails/screens/creation/merchant_form.dart';
 import 'package:Satsails/screens/login/seed_words_pin.dart';
 import 'package:Satsails/screens/pay/components/camera.dart';
 import 'package:Satsails/screens/pay/components/confirm_lightning_payment.dart';
@@ -28,6 +30,7 @@ import 'package:Satsails/screens/creation/start.dart';
 import 'package:Satsails/screens/pay/components/confirm_liquid_payment.dart';
 import 'package:Satsails/screens/settings/components/seed_words.dart';
 import 'package:Satsails/screens/settings/components/export_xpub.dart';
+import 'package:Satsails/screens/settings/components/affiliate_benefits.dart';
 import 'package:Satsails/screens/settings/components/otc_selection.dart';
 import 'package:Satsails/screens/login/export_xpub_pin.dart';
 import 'package:Satsails/screens/settings/settings.dart';
@@ -108,6 +111,22 @@ class AppRouter {
               state: state,
             );
           },
+        ),
+        GoRoute(
+          path: '/customer_type',
+          name: 'customer_type',
+          pageBuilder: (context, state) => _buildFadeScalePage(
+            child: const CustomerTypeSelection(),
+            state: state,
+          ),
+        ),
+        GoRoute(
+          path: '/merchant_form',
+          name: 'merchant_form',
+          pageBuilder: (context, state) => _buildFadeScalePage(
+            child: const MerchantForm(),
+            state: state,
+          ),
         ),
         GoRoute(
           path: '/splash',
@@ -224,6 +243,14 @@ class AppRouter {
           name: 'otc_selection',
           pageBuilder: (context, state) => _buildFadeScalePage(
             child: const OtcSelection(),
+            state: state,
+          ),
+        ),
+        GoRoute(
+          path: '/affiliate_benefits',
+          name: 'affiliate_benefits',
+          pageBuilder: (context, state) => _buildFadeScalePage(
+            child: const AffiliateBenefits(),
             state: state,
           ),
         ),

@@ -2,6 +2,7 @@ import 'package:Satsails/providers/address_provider.dart';
 import 'package:Satsails/providers/auth_provider.dart';
 import 'package:Satsails/providers/bitcoin_config_provider.dart';
 import 'package:Satsails/providers/liquid_config_provider.dart';
+import 'package:Satsails/providers/user_provider.dart';
 import 'package:Satsails/screens/creation/set_pin.dart'; // Contains pinProvider
 import 'package:Satsails/screens/shared/custom_button.dart';
 import 'package:Satsails/screens/shared/custom_keypad.dart';
@@ -60,12 +61,14 @@ class _ConfirmPinState extends ConsumerState<ConfirmPin>
       }
       ref.read(pinProvider.notifier).state = '';
 
+      await ref.read(createUserProvider.future);
+
       if (mounted) {
         ref.invalidate(bitcoinConfigProvider);
         ref.invalidate(liquidConfigProvider);
         ref.read(addressProvider);
 
-        context.go('/affiliate');
+        context.go('/customer_type');
       }
     } catch (e) {
       if (mounted) {

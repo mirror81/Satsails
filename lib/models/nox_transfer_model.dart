@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:Satsails/handlers/response_handlers.dart';
+import 'package:Satsails/helpers/http_helper.dart';
 import 'package:Satsails/helpers/string_extension.dart';
 import 'package:Satsails/translations/localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -418,6 +419,7 @@ class NoxTransfer extends HiveObject {
 class NoxService {
   static Future<Result<String>> createTransaction(String auth, String address, String? amountCrypto, String? amountFiat, String transactionType) async {
     try {
+      final headers = await HttpHelper.authHeaders(auth);
       final response = await http.post(
         Uri.parse('${dotenv.env['BACKEND']!}/nox_transfers'),
         body: jsonEncode({
@@ -429,10 +431,7 @@ class NoxService {
             'amount_fiat': amountFiat,
           }
         }),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': auth,
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 201) {
@@ -448,13 +447,11 @@ class NoxService {
 
   static Future<Result<List<NoxTransfer>>> getTransfers(String auth) async {
     try {
+      final headers = await HttpHelper.authHeaders(auth);
       final uri = Uri.parse('${dotenv.env['BACKEND']!}/nox_transfers');
       final response = await http.get(
         uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': auth,
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -473,13 +470,11 @@ class NoxService {
 
   static Future<Result<NoxTransfer>> getTransfer(String auth, String transferId) async {
     try {
+      final headers = await HttpHelper.authHeaders(auth);
       final uri = Uri.parse('${dotenv.env['BACKEND']!}/nox_transfers/$transferId');
       final response = await http.get(
         uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': auth,
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -497,13 +492,11 @@ class NoxService {
 
   static Future<Result<MinimumDeposit>> getMinimumDeposit(String auth) async {
     try {
+      final headers = await HttpHelper.authHeaders(auth);
       final uri = Uri.parse('${dotenv.env['BACKEND']!}/nox_transfers/minimum_deposits');
       final response = await http.get(
         uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': auth,
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {

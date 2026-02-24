@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:Satsails/handlers/response_handlers.dart';
+import 'package:Satsails/helpers/http_helper.dart';
 import 'package:bdk_flutter/bdk_flutter.dart';
 import 'package:bitcoin_message_signer/bitcoin_message_signer.dart';
 import 'package:flutter/services.dart';
@@ -82,11 +83,11 @@ class BackendAuth {
         return Result(error: 'Backend URL is not configured');
       }
 
+      final headers = await HttpHelper.headers();
+
       final response = await http.get(
         Uri.parse('$backendUrl/auth/challenge'),
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: headers,
       );
 
       final dynamic jsonResponse = json.decode(response.body);

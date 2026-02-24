@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:Satsails/handlers/response_handlers.dart';
+import 'package:Satsails/helpers/http_helper.dart';
 import 'package:Satsails/helpers/string_extension.dart';
 import 'package:Satsails/translations/localizations.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -298,23 +299,16 @@ class EulenService {
   /// Creates a new Eulen transaction (purchase or sale).
   static Future<Result<EulenTransfer>> createTransaction(String auth, double amount, String liquidAddress, {String transactionType = 'BUY'}) async {
     try {
-      // final appCheckToken = await FirebaseAppCheck.instance.getToken();
+      final headers = await HttpHelper.authHeaders(auth);
       final response = await http.post(
         Uri.parse('${dotenv.env['BACKEND']!}/eulen_transfers'),
         body: jsonEncode({
           'transfer': {
             'value_set_to_receive': amount,
             'liquid_address': liquidAddress,
-            // 'type': transactionType,
-            // 'to_currency': transactionType,
-            // 'from_currency': transactionType,
           }
         }),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': auth,
-          // 'X-Firebase-AppCheck': appCheckToken ?? '',
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 201) {
@@ -330,16 +324,12 @@ class EulenService {
   /// Retrieves a list of Eulen transactions.
   static Future<Result<List<EulenTransfer>>> getTransfers(String auth) async {
     try {
-      // final appCheckToken = await FirebaseAppCheck.instance.getToken();
+      final headers = await HttpHelper.authHeaders(auth);
       final uri = Uri.parse('${dotenv.env['BACKEND']!}/eulen_transfers');
 
       final response = await http.get(
         uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': auth,
-          // 'X-Firebase-AppCheck': appCheckToken ?? '',
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -359,16 +349,12 @@ class EulenService {
   /// Gets the amount transferred for the day.
   static Future<Result<String>> getAmountTransferred(String auth) async {
     try {
-      // final appCheckToken = await FirebaseAppCheck.instance.getToken();
+      final headers = await HttpHelper.authHeaders(auth);
       final uri = Uri.parse('${dotenv.env['BACKEND']!}/eulen_transfers/amount_transfered_by_day');
 
       final response = await http.get(
         uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': auth,
-          // 'X-Firebase-AppCheck': appCheckToken ?? '',
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
@@ -383,18 +369,14 @@ class EulenService {
 
   static Future<Result<bool>> getTransactionPaymentState(String transactionId, String auth) async {
     try {
-      // final appCheckToken = await FirebaseAppCheck.instance.getToken();
+      final headers = await HttpHelper.authHeaders(auth);
       final uri = Uri.parse('${dotenv.env['BACKEND']!}/eulen_transfers/check_purchase_state')
           .replace(queryParameters: {'transfer[txid]': transactionId,
       });
 
       final response = await http.get(
         uri,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': auth,
-          // 'X-Firebase-AppCheck': appCheckToken ?? '',
-        },
+        headers: headers,
       );
 
       if (response.statusCode == 200) {

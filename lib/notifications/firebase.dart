@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:Satsails/helpers/http_helper.dart';
 import 'package:Satsails/models/auth_model.dart';
 import 'package:Satsails/models/breez/init.dart';
 import 'package:Satsails/models/breez/sdk_instance.dart';
@@ -160,12 +161,10 @@ class FirebaseService {
 
   static Future<void> sendTokenToBackend(String jwt, String token) async {
     try {
+      final headers = await HttpHelper.authHeaders('Bearer $jwt');
       await http.post(
         Uri.parse('${dotenv.env['BACKEND']!}/users/store_fcm_token'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $jwt',
-        },
+        headers: headers,
         body: jsonEncode({
           'user': {
             'fcm_token': token,

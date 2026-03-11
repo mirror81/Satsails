@@ -469,6 +469,11 @@ class _DepositPixState extends ConsumerState<DepositDepixPixEulen>
             icon: Icons.warning_amber_rounded,
             child: Text("Transfers that don't follow these rules will be returned".i18n, style: TextStyle(fontSize: 15.sp, color: Colors.white.withOpacity(0.8), fontWeight: FontWeight.w500)),
           ),
+          SizedBox(height: 12.h),
+          _buildInfoRow(
+            icon: Icons.schedule,
+            child: Text("Due to the high number of frauds, DePix purchases are subject to a 24h window before arriving in your wallet.".i18n, style: TextStyle(fontSize: 15.sp, color: Colors.orangeAccent, fontWeight: FontWeight.w500)),
+          ),
         ]));
   }
   // ===============================================

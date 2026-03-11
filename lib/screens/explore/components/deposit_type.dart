@@ -10,6 +10,45 @@ import 'package:go_router/go_router.dart';
 class DepositTypeScreen extends ConsumerWidget {
   const DepositTypeScreen({super.key});
 
+  void _showBuyDisclaimer(BuildContext context, String route) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1E1E1E),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16.r)),
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.orangeAccent, size: 28.sp),
+            SizedBox(width: 8.w),
+            Expanded(
+              child: Text(
+                'Important'.i18n,
+                style: TextStyle(color: Colors.white, fontSize: 18.sp, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+        content: Text(
+          'Due to the high number of frauds, DePix purchases are subject to a 24h window before arriving in your wallet.'.i18n,
+          style: TextStyle(color: Colors.white70, fontSize: 15.sp, height: 1.4),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: Text('Cancel'.i18n, style: TextStyle(color: Colors.grey, fontSize: 15.sp)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.of(ctx).pop();
+              context.pushNamed(route);
+            },
+            child: Text('I understand'.i18n, style: TextStyle(color: Colors.orangeAccent, fontSize: 15.sp, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedCurrency = ref.watch(selectedCurrencyProvider);
@@ -125,7 +164,11 @@ class DepositTypeScreen extends ConsumerWidget {
                               selectedProvider == DepositProvider.Eulen
                                   ? 'DepositPixEulen'
                                   : 'DepositPixNox';
-                              context.pushNamed(route);
+                              if (selectedProvider == DepositProvider.Eulen) {
+                                _showBuyDisclaimer(context, route);
+                              } else {
+                                context.pushNamed(route);
+                              }
                             }
                                 : () {}, // Provide an empty function for disabled state
                             primaryColor: isButtonEnabled

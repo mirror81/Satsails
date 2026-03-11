@@ -1044,7 +1044,10 @@ extension Localization on String {
           'Email': 'Email',
           'Continue': 'Continue',
           'Please fill all fields': 'Please fill all fields',
-          'Invalid email': 'Invalid email'
+          'Invalid email': 'Invalid email',
+          'Important': 'Important',
+          'Due to the high number of frauds, DePix purchases are subject to a 24h window before arriving in your wallet.': 'Due to the high number of frauds, DePix purchases are subject to a 24h window before arriving in your wallet.',
+          'I understand': 'I understand'
         },
         'pt': {
           'View Accounts': 'Ver Contas',
@@ -2134,6 +2137,9 @@ extension Localization on String {
           'Continue': 'Continuar',
           'Please fill all fields': 'Por favor, preencha todos os campos',
           'Invalid email': 'Email inválido',
+          'Important': 'Importante',
+          'Due to the high number of frauds, DePix purchases are subject to a 24h window before arriving in your wallet.': 'Devido à grande quantidade de fraudes, a compra de DePix está sujeita a uma janela de 24h para cair em sua carteira.',
+          'I understand': 'Eu entendo',
         }
       };
 
